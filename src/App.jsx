@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BrainCircuit } from 'lucide-react';
+import { BrainCircuit, Calculator as CalculatorIcon } from 'lucide-react';
 import GeminiInput from './components/GeminiInput';
 import CryptoSelector from './components/CryptoSelector';
 import TimeframeSelector from './components/TimeframeSelector';
 import AnalysisResult from './components/AnalysisResult';
 import PriceChart from './components/PriceChart';
 import FearAndGreed from './components/FearAndGreed';
-import { getTopCryptos, getCandleData, getGeminiAnalysis } from './services/api';
+import StrategySelector from './components/StrategySelector';
+import RiskCalculator from './components/RiskCalculator';
+import { getTopCryptos, getCandleData, getGeminiAnalysis, getMultiTimeframeData } from './services/api';
 import { calculateIndicators } from './utils/indicators';
 
 const App = () => {
@@ -17,6 +19,8 @@ const App = () => {
   const [timeframe, setTimeframe] = useState('4h');
   const [candles, setCandles] = useState([]);
   const [marketSentiment, setMarketSentiment] = useState(null);
+  const [strategy, setStrategy] = useState('trend_follower');
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [analysis, setAnalysis] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -56,56 +60,59 @@ const App = () => {
     setAnalysis('');
 
     try {
-      // Use existing candles or refetch if empty
-      let currentCandles = candles;
-      if (!currentCandles.length) {
-        currentCandles = await getCandleData(selectedCrypto.symbol, timeframe);
-        setCandles(currentCandles);
+      // 1. Fetch Multi-Timeframe Data
+      const mtfData = await getMultiTimeframeData(selectedCrypto.symbol, timeframe);
+
+      if (!mtfData.mtf.data.length) {
+        throw new Error('No se pudieron obtener datos del mercado.');
       }
 
-      if (!currentCandles.length) {
-        throw new Error('No se pudieron obtener datos del mercado. Por favor intenta de nuevo.');
-      }
+      // 2. Calculate Indicators for Current Timeframe (MTF)
+      const indicators = calculateIndicators(mtfData.mtf.data);
+      const currentPrice = mtfData.mtf.data[mtfData.mtf.data.length - 1].close;
 
-      // Calculate indicators
-      const indicators = calculateIndicators(currentCandles);
-      const currentPrice = currentCandles[currentCandles.length - 1].close;
+      // Calculate HTF Trend (Simple Check: Price vs EMA200 on HTF)
+      const htfIndicators = calculateIndicators(mtfData.htf.data);
+      const htfTrend = htfIndicators.ema200 && mtfData.htf.data.slice(-1)[0].close > htfIndicators.ema200 ? 'ALCISTA' : 'BAJISTA';
 
       const fearAndGreedText = marketSentiment
         ? `${marketSentiment.value} (${marketSentiment.value_classification})`
         : 'Datos no disponibles';
 
-      // Construct prompt
+      // 3. Construct Context-Aware Prompt
       const prompt = `
-        Actúa como un experto trader de criptomonedas. Analiza los siguientes datos para ${selectedCrypto.symbol} en la temporalidad de ${timeframe}.
+        Actúa como un ${strategy === 'scalper' ? 'Scalper Agresivo' : strategy === 'mean_reversion' ? 'Trader de Reversión' : 'Trader Institucional de Tendencias'}.
         
-        Precio Actual: ${currentPrice}
+        Analiza ${selectedCrypto.symbol} con un enfoque de **Análisis Multi-Temporal (MTA)**:
         
-        Sentimiento General del Mercado (Fear & Greed Index): ${fearAndGreedText}
+        1. **Tendencia Macro (${mtfData.htf.timeframe})**: ${htfTrend} (Precio vs EMA200).
+        2. **Estructura Actual (${mtfData.mtf.timeframe})**:
+           - Precio: ${currentPrice}
+           - RSI (14): ${indicators.rsi.toFixed(2)}
+           - MACD: ${indicators.macd.MACD?.toFixed(4)}
+           - Bandas Bollinger: Rango ${indicators.bb.lower?.toFixed(4)} - ${indicators.bb.upper?.toFixed(4)}
+        3. **Micro-Estructura (${mtfData.ltf.timeframe})**:
+           - Cierre Reciente: ${mtfData.ltf.data.slice(-1)[0].close}
         
-        Indicadores Técnicos:
-        - RSI (14): ${indicators.rsi.toFixed(2)}
-        - MACD: ${indicators.macd.MACD?.toFixed(4) || 0} (Señal: ${indicators.macd.signal?.toFixed(4) || 0}, Histograma: ${indicators.macd.histogram?.toFixed(4) || 0})
-        - Bandas de Bollinger: Superior ${indicators.bb.upper?.toFixed(4) || 0}, Inferior ${indicators.bb.lower?.toFixed(4) || 0}, Media ${indicators.bb.middle?.toFixed(4) || 0}
-        - EMA (50): ${indicators.ema50.toFixed(4)}
-        - EMA (200): ${indicators.ema200.toFixed(4)}
+        **Contexto Global**:
+        - Sentimiento: ${fearAndGreedText}
+        - Estrategia Seleccionada: ${strategy.toUpperCase()}
         
-        Historial de Precios Reciente (Últimas 5 velas - Cierre):
-        ${currentCandles.slice(-5).map(c => c.close).join(', ')}
-
-        Basado en estos datos, proporciona un consejo de trading específico para un trader de SPOT (que busca comprar barato y vender caro).
+        **Instrucciones**:
+        ${marketSentiment?.value_classification === 'Neutral' ? '⚠️ ADVERTENCIA: Mercado sin dirección clara (Choppy). Prioriza la preservación de capital.' : ''}
         
-        Estructura tu respuesta de la siguiente manera:
-        1. **Sentimiento del Mercado**: Integra el análisis técnico con el índice de Miedo y Codicia. ¿Es un momento de compra por miedo extremo o venta por euforia?
-        2. **Análisis Técnico**: analiza profundamente los indicadores. ¿El precio respeta las EMAs?
-        3. **Estrategia de Trading Spot**: 
-           - **Acción**: COMPRAR / VENDER / MANTENER / ESPERAR
-           - **Precio de Entrada**: Rango preciso.
-           - **Stop Loss**: (Opcional en spot, pero sugerido).
-           - **Take Profit**: Objetivos clave.
-        4. **Advertencia de Riesgo**: Breve.
-
-        Mantén un tono profesional pero accesible. Responde en ESPAÑOL.
+        Genera un Plan de Trading detallado en ESPAÑOL:
+        
+        1. **Diagnóstico MTA**: ¿Están alineadas la tendencia Macro y Micro?
+        2. **Estrategia Ejecutable**:
+           - **Dirección**: LONG / SHORT / ESPERAR
+           - **Zona de Entrada**: Precio exacto o confirmación necesaria en ${mtfData.ltf.timeframe}.
+           - **Stop Loss**: Nivel técnico (Soporte/Resistencia).
+           - **Take Profit**: Objetivos logicos.
+        3. **Gestión de Riesgo**:
+           - Sugerencia de tamaño de posición (Conservador/Agresivo) dada la confianza del setup.
+        
+        Sé directo, profesional y evita la ambigüedad.
       `;
 
       // Call Gemini
@@ -122,20 +129,26 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground p-6 font-sans selection:bg-accent selection:text-accent-foreground">
+      <RiskCalculator
+        isOpen={isCalculatorOpen}
+        onClose={() => setIsCalculatorOpen(false)}
+        currentPrice={candles[candles.length - 1]?.close}
+      />
+
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-6xl mx-auto"
+        className="max-w-7xl mx-auto"
       >
-        <header className="text-center mb-12 pt-8">
+        <header className="text-center mb-10 pt-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <BrainCircuit className="w-10 h-10 text-accent" />
             <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 to-accent bg-clip-text text-transparent">
-              CryptoOracle
+              CryptoOracle Pro
             </h1>
           </div>
           <p className="text-muted-foreground text-lg">
-            AI-Powered Spot Trading Analysis
+            Institutional-Grade Multi-Timeframe Analysis
           </p>
         </header>
 
@@ -144,69 +157,95 @@ const App = () => {
             <GeminiInput onApiKeySubmit={handleApiKeySubmit} />
           </div>
         ) : (
-          <div className="space-y-8">
-            {/* Control Panel */}
-            <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
-              <div className="flex flex-col xl:flex-row gap-6 items-end justify-between">
-                <div className="w-full xl:w-2/3 flex flex-col md:flex-row gap-4">
-                  <div className="flex-1">
-                    <CryptoSelector cryptos={cryptos} onSelect={setSelectedCrypto} />
-                  </div>
-                  <div>
-                    <TimeframeSelector selected={timeframe} onSelect={setTimeframe} />
-                  </div>
+          <div className="space-y-6">
+            {/* Top Control Bar */}
+            <div className="bg-card border border-border p-4 rounded-xl shadow-lg flex flex-col lg:flex-row items-center justify-between gap-4">
+              <div className="w-full lg:w-auto flex flex-col sm:flex-row gap-4 flex-1">
+                <div className="flex-1 min-w-[200px]">
+                  <CryptoSelector cryptos={cryptos} onSelect={setSelectedCrypto} />
                 </div>
+                <div className="min-w-[150px]">
+                  <TimeframeSelector selected={timeframe} onSelect={setTimeframe} />
+                </div>
+              </div>
 
-                <div className="w-full xl:w-1/3 flex flex-col gap-4">
-                  <div className="flex justify-end">
-                    <FearAndGreed onValueChange={setMarketSentiment} />
-                  </div>
+              <div className="flex items-center gap-4 w-full lg:w-auto justify-end">
+                <FearAndGreed onValueChange={setMarketSentiment} />
+                <button
+                  onClick={() => setIsCalculatorOpen(true)}
+                  className="p-3 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg border border-accent/20 transition-colors"
+                  title="Risk Calculator"
+                >
+                  <CalculatorIcon className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem('gemini_api_key');
+                    setApiKey('');
+                  }}
+                  className="text-xs text-muted-foreground hover:text-destructive transition-colors whitespace-nowrap"
+                >
+                  Salir
+                </button>
+              </div>
+            </div>
+
+            {/* Strategy & Chart Grid */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              {/* Left Column: Strategy & Analysis */}
+              <div className="space-y-6 xl:col-span-1">
+                <section className="bg-card border border-border p-5 rounded-xl">
+                  <StrategySelector selected={strategy} onSelect={setStrategy} />
+
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleAnalysis}
                     disabled={!selectedCrypto || isLoading}
-                    className="w-full bg-gradient-to-r from-blue-600 to-accent text-white font-bold py-3 rounded-lg shadow-lg hover:shadow-accent/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full mt-6 bg-gradient-to-r from-blue-600 to-accent text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-accent/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isLoading ? 'Analyzing Market...' : 'Generate AI Analysis'}
+                    {isLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <BrainCircuit className="w-5 h-5 animate-pulse" />
+                        Analizando 3 Temporalidades...
+                      </span>
+                    ) : (
+                      'Ejecutar Análisis Pro'
+                    )}
                   </motion.button>
+                </section>
+
+                {/* Analysis Result Mobile/Desktop */}
+                <div className="hidden xl:block">
+                  <AnalysisResult analysis={analysis} isLoading={isLoading} error={error} />
                 </div>
               </div>
-            </div>
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-              {/* Chart Section */}
-              {selectedCrypto && candles.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="space-y-4"
-                >
-                  <PriceChart
-                    data={candles}
-                    symbol={selectedCrypto.symbol}
-                    timeframe={timeframe}
-                  />
-                </motion.div>
-              )}
+              {/* Right Column: Charts */}
+              <div className="xl:col-span-2 space-y-4">
+                {selectedCrypto && candles.length > 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="h-full"
+                  >
+                    <PriceChart
+                      data={candles}
+                      symbol={selectedCrypto.symbol}
+                      timeframe={timeframe}
+                    />
+                  </motion.div>
+                ) : (
+                  <div className="h-[400px] bg-card/50 border border-border/50 rounded-xl flex items-center justify-center text-muted-foreground">
+                    Selecciona una criptomoneda para ver el gráfico
+                  </div>
+                )}
 
-              {/* Analysis Section */}
-              <div className={!selectedCrypto ? "col-span-2" : ""}>
-                <AnalysisResult analysis={analysis} isLoading={isLoading} error={error} />
+                {/* Analysis below chart for mobile */}
+                <div className="xl:hidden">
+                  <AnalysisResult analysis={analysis} isLoading={isLoading} error={error} />
+                </div>
               </div>
-            </div>
-
-            <div className="text-center pt-8">
-              <button
-                onClick={() => {
-                  localStorage.removeItem('gemini_api_key');
-                  setApiKey('');
-                }}
-                className="text-xs text-muted-foreground hover:text-destructive transition-colors"
-              >
-                Clear API Key
-              </button>
             </div>
           </div>
         )}

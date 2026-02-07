@@ -105,3 +105,30 @@ export const getGeminiAnalysis = async (apiKey, prompt) => {
         }
     }
 };
+// Helper to determine timeframes
+const getTimeframeContext = (currentFrame) => {
+    switch (currentFrame) {
+        case '15m': return { htf: '4h', ltf: '5m' };
+        case '1h': return { htf: '4h', ltf: '15m' };
+        case '4h': return { htf: '1d', ltf: '1h' };
+        case '1d': return { htf: '1w', ltf: '4h' };
+        default: return { htf: '1d', ltf: '15m' };
+    }
+};
+
+export const getMultiTimeframeData = async (symbol, currentFrame) => {
+    const { htf, ltf } = getTimeframeContext(currentFrame);
+
+    // Parallel fetch
+    const [mtfData, htfData, ltfData] = await Promise.all([
+        getCandleData(symbol, currentFrame),
+        getCandleData(symbol, htf),
+        getCandleData(symbol, ltf)
+    ]);
+
+    return {
+        mtf: { timeframe: currentFrame, data: mtfData },
+        htf: { timeframe: htf, data: htfData },
+        ltf: { timeframe: ltf, data: ltfData }
+    };
+};
