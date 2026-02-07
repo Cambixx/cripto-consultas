@@ -190,62 +190,52 @@ const App = () => {
               </div>
             </div>
 
-            {/* Strategy & Chart Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              {/* Left Column: Strategy & Analysis */}
-              <div className="space-y-6 xl:col-span-1">
-                <section className="bg-card border border-border p-5 rounded-xl">
-                  <StrategySelector selected={strategy} onSelect={setStrategy} />
-
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleAnalysis}
-                    disabled={!selectedCrypto || isLoading}
-                    className="w-full mt-6 bg-gradient-to-r from-blue-600 to-accent text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-accent/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isLoading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <BrainCircuit className="w-5 h-5 animate-pulse" />
-                        Analizando 3 Temporalidades...
-                      </span>
-                    ) : (
-                      'Ejecutar Análisis Pro'
-                    )}
-                  </motion.button>
-                </section>
-
-                {/* Analysis Result Mobile/Desktop */}
-                <div className="hidden xl:block">
-                  <AnalysisResult analysis={analysis} isLoading={isLoading} error={error} />
+            {/* Price Chart - Full Width */}
+            <div className="w-full">
+              {selectedCrypto && candles.length > 0 ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="w-full min-h-[500px]"
+                >
+                  <PriceChart
+                    data={candles}
+                    symbol={selectedCrypto.symbol}
+                    timeframe={timeframe}
+                  />
+                </motion.div>
+              ) : (
+                <div className="h-[400px] bg-card/50 border border-border/50 rounded-xl flex items-center justify-center text-muted-foreground">
+                  Selecciona una criptomoneda para ver el gráfico
                 </div>
-              </div>
+              )}
+            </div>
 
-              {/* Right Column: Charts */}
-              <div className="xl:col-span-2 space-y-4">
-                {selectedCrypto && candles.length > 0 ? (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="h-full"
-                  >
-                    <PriceChart
-                      data={candles}
-                      symbol={selectedCrypto.symbol}
-                      timeframe={timeframe}
-                    />
-                  </motion.div>
+            {/* Strategy Selection & Action - Full Width */}
+            <div className="bg-card border border-border p-6 rounded-xl shadow-lg space-y-6">
+              <StrategySelector selected={strategy} onSelect={setStrategy} />
+
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={handleAnalysis}
+                disabled={!selectedCrypto || isLoading}
+                className="w-full bg-gradient-to-r from-blue-600 to-accent text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-accent/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+              >
+                {isLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <BrainCircuit className="w-6 h-6 animate-pulse" />
+                    Analizando Tendencia Macro (1D), Estructura (4H) y Entrada ({timeframe})...
+                  </span>
                 ) : (
-                  <div className="h-[400px] bg-card/50 border border-border/50 rounded-xl flex items-center justify-center text-muted-foreground">
-                    Selecciona una criptomoneda para ver el gráfico
-                  </div>
+                  'Ejecutar Análisis Profesional Multi-Temporal'
                 )}
+              </motion.button>
+            </div>
 
-                {/* Analysis below chart for mobile */}
-                <div className="xl:hidden">
-                  <AnalysisResult analysis={analysis} isLoading={isLoading} error={error} />
-                </div>
-              </div>
+            {/* Analysis Result - Full Width */}
+            <div className="w-full">
+              <AnalysisResult analysis={analysis} isLoading={isLoading} error={error} />
             </div>
           </div>
         )}
