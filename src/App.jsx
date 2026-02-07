@@ -5,6 +5,8 @@ import GeminiInput from './components/GeminiInput';
 import CryptoSelector from './components/CryptoSelector';
 import TimeframeSelector from './components/TimeframeSelector';
 import AnalysisResult from './components/AnalysisResult';
+import PriceChart from './components/PriceChart';
+import FearAndGreed from './components/FearAndGreed';
 import { getTopCryptos, getCandleData, getGeminiAnalysis } from './services/api';
 import { calculateIndicators } from './utils/indicators';
 
@@ -13,6 +15,8 @@ const App = () => {
   const [cryptos, setCryptos] = useState([]);
   const [selectedCrypto, setSelectedCrypto] = useState(null);
   const [timeframe, setTimeframe] = useState('4h');
+  const [candles, setCandles] = useState([]);
+  const [marketSentiment, setMarketSentiment] = useState(null);
   const [analysis, setAnalysis] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -24,6 +28,20 @@ const App = () => {
     };
     fetchCryptos();
   }, []);
+
+  // Auto-fetch candles when selection changes
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!selectedCrypto) return;
+      try {
+        const data = await getCandleData(selectedCrypto.symbol, timeframe);
+        setCandles(data);
+      } catch (e) {
+        console.error("Failed to fetch candles", e);
+      }
+    };
+    fetchData();
+  }, [selectedCrypto, timeframe]);
 
   const handleApiKeySubmit = (key) => {
     setApiKey(key);
@@ -38,22 +56,32 @@ const App = () => {
     setAnalysis('');
 
     try {
-      // Fetch candle data
-      const candles = await getCandleData(selectedCrypto.symbol, timeframe);
+      // Use existing candles or refetch if empty
+      let currentCandles = candles;
+      if (!currentCandles.length) {
+        currentCandles = await getCandleData(selectedCrypto.symbol, timeframe);
+        setCandles(currentCandles);
+      }
 
-      if (!candles.length) {
-        throw new Error('Failed to fetch market data. Please try again.');
+      if (!currentCandles.length) {
+        throw new Error('No se pudieron obtener datos del mercado. Por favor intenta de nuevo.');
       }
 
       // Calculate indicators
-      const indicators = calculateIndicators(candles);
-      const currentPrice = candles[candles.length - 1].close;
+      const indicators = calculateIndicators(currentCandles);
+      const currentPrice = currentCandles[currentCandles.length - 1].close;
+
+      const fearAndGreedText = marketSentiment
+        ? `${marketSentiment.value} (${marketSentiment.value_classification})`
+        : 'Datos no disponibles';
 
       // Construct prompt
       const prompt = `
         Actúa como un experto trader de criptomonedas. Analiza los siguientes datos para ${selectedCrypto.symbol} en la temporalidad de ${timeframe}.
         
         Precio Actual: ${currentPrice}
+        
+        Sentimiento General del Mercado (Fear & Greed Index): ${fearAndGreedText}
         
         Indicadores Técnicos:
         - RSI (14): ${indicators.rsi.toFixed(2)}
@@ -63,21 +91,21 @@ const App = () => {
         - EMA (200): ${indicators.ema200.toFixed(4)}
         
         Historial de Precios Reciente (Últimas 5 velas - Cierre):
-        ${candles.slice(-5).map(c => c.close).join(', ')}
+        ${currentCandles.slice(-5).map(c => c.close).join(', ')}
 
         Basado en estos datos, proporciona un consejo de trading específico para un trader de SPOT (que busca comprar barato y vender caro).
         
         Estructura tu respuesta de la siguiente manera:
-        1. **Sentimiento del Mercado**: ¿Alcista, Bajista o Neutral?
-        2. **Análisis Técnico**: analiza profundamente los indicadores. ¿Está el RSI sobrecomprado/sobrevendido? ¿El precio está por encima/debajo de las EMAs? ¿Cruce de MACD?
+        1. **Sentimiento del Mercado**: Integra el análisis técnico con el índice de Miedo y Codicia. ¿Es un momento de compra por miedo extremo o venta por euforia?
+        2. **Análisis Técnico**: analiza profundamente los indicadores. ¿El precio respeta las EMAs?
         3. **Estrategia de Trading Spot**: 
            - **Acción**: COMPRAR / VENDER / MANTENER / ESPERAR
-           - **Precio de Entrada**: Rango de entrada sugerido si es compra.
-           - **Stop Loss**: Nivel sugerido (aunque es spot, para gestión de riesgo).
-           - **Take Profit**: Niveles objetivos.
-        4. **Advertencia de Riesgo**: Breve descargo de responsabilidad.
+           - **Precio de Entrada**: Rango preciso.
+           - **Stop Loss**: (Opcional en spot, pero sugerido).
+           - **Take Profit**: Objetivos clave.
+        4. **Advertencia de Riesgo**: Breve.
 
-        Mantén un tono profesional pero accesible. Enfócate en oportunidades potenciales. Responde completamente en ESPAÑOL.
+        Mantén un tono profesional pero accesible. Responde en ESPAÑOL.
       `;
 
       // Call Gemini
@@ -86,7 +114,7 @@ const App = () => {
 
     } catch (err) {
       console.error(err);
-      setError(err.message || 'An unexpected error occurred.');
+      setError(err.message || 'Ocurrió un error inesperado.');
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +125,7 @@ const App = () => {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-4xl mx-auto"
+        className="max-w-6xl mx-auto"
       >
         <header className="text-center mb-12 pt-8">
           <div className="flex items-center justify-center gap-3 mb-4">
@@ -112,33 +140,64 @@ const App = () => {
         </header>
 
         {!apiKey ? (
-          <GeminiInput onApiKeySubmit={handleApiKeySubmit} />
+          <div className="max-w-md mx-auto">
+            <GeminiInput onApiKeySubmit={handleApiKeySubmit} />
+          </div>
         ) : (
           <div className="space-y-8">
+            {/* Control Panel */}
             <div className="bg-card border border-border p-6 rounded-xl shadow-lg">
-              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div className="w-full md:w-1/2">
-                  <CryptoSelector cryptos={cryptos} onSelect={setSelectedCrypto} />
+              <div className="flex flex-col xl:flex-row gap-6 items-end justify-between">
+                <div className="w-full xl:w-2/3 flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <CryptoSelector cryptos={cryptos} onSelect={setSelectedCrypto} />
+                  </div>
+                  <div>
+                    <TimeframeSelector selected={timeframe} onSelect={setTimeframe} />
+                  </div>
                 </div>
-                <div className="w-full md:w-auto">
-                  <TimeframeSelector selected={timeframe} onSelect={setTimeframe} />
+
+                <div className="w-full xl:w-1/3 flex flex-col gap-4">
+                  <div className="flex justify-end">
+                    <FearAndGreed onValueChange={setMarketSentiment} />
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleAnalysis}
+                    disabled={!selectedCrypto || isLoading}
+                    className="w-full bg-gradient-to-r from-blue-600 to-accent text-white font-bold py-3 rounded-lg shadow-lg hover:shadow-accent/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? 'Analyzing Market...' : 'Generate AI Analysis'}
+                  </motion.button>
                 </div>
               </div>
-
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleAnalysis}
-                disabled={!selectedCrypto || isLoading}
-                className="w-full mt-6 bg-gradient-to-r from-blue-600 to-accent text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-accent/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg"
-              >
-                {isLoading ? 'Analyzing Market Data...' : 'Generate AI Analysis'}
-              </motion.button>
             </div>
 
-            <AnalysisResult analysis={analysis} isLoading={isLoading} error={error} />
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+              {/* Chart Section */}
+              {selectedCrypto && candles.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="space-y-4"
+                >
+                  <PriceChart
+                    data={candles}
+                    symbol={selectedCrypto.symbol}
+                    timeframe={timeframe}
+                  />
+                </motion.div>
+              )}
 
-            <div className="text-center">
+              {/* Analysis Section */}
+              <div className={!selectedCrypto ? "col-span-2" : ""}>
+                <AnalysisResult analysis={analysis} isLoading={isLoading} error={error} />
+              </div>
+            </div>
+
+            <div className="text-center pt-8">
               <button
                 onClick={() => {
                   localStorage.removeItem('gemini_api_key');
