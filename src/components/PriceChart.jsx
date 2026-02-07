@@ -33,13 +33,34 @@ const PriceChart = ({ data, symbol, timeframe }) => {
             }
         });
 
-        // Create Candlestick Series using v5 API
+        // Determine precision based on the first price (or average)
+        const firstPrice = data[data.length - 1]?.close || 0;
+        let precision = 2;
+        let minMove = 0.01;
+
+        if (firstPrice > 0 && firstPrice < 0.001) {
+            precision = 8;
+            minMove = 0.00000001;
+        } else if (firstPrice >= 0.001 && firstPrice < 1) {
+            precision = 6;
+            minMove = 0.000001;
+        } else if (firstPrice >= 1 && firstPrice < 1000) {
+            precision = 3;
+            minMove = 0.001;
+        }
+
+        // Create Candlestick Series using v5 API with dynamic precision
         const candlestickSeries = chart.addSeries(CandlestickSeries, {
             upColor: '#22c55e', // green-500
             downColor: '#ef4444', // red-500
             borderVisible: false,
             wickUpColor: '#22c55e',
             wickDownColor: '#ef4444',
+            priceFormat: {
+                type: 'price',
+                precision: precision,
+                minMove: minMove,
+            },
         });
 
         // Determine data format based on timeframe (Binance returns timestamps in ms)
