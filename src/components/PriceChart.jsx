@@ -19,7 +19,9 @@ const PriceChart = ({ data, symbol, timeframe }) => {
         if (!chartContainerRef.current || !data.length) return;
 
         const handleResize = () => {
-            chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+            if (chartRef.current && chartContainerRef.current) {
+                chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+            }
         };
 
         const chart = createChart(chartContainerRef.current, {
@@ -78,6 +80,7 @@ const PriceChart = ({ data, symbol, timeframe }) => {
         return () => {
             window.removeEventListener('resize', handleResize);
             chart.remove();
+            seriesRef.current = {};
         };
     }, [data]);
 
@@ -88,7 +91,7 @@ const PriceChart = ({ data, symbol, timeframe }) => {
     }, [data]);
 
     useEffect(() => {
-        if (!chartRef.current || !allIndicators) return;
+        if (!chartRef.current || !allIndicators || !seriesRef.current.candles) return;
         const chart = chartRef.current;
 
         // EMA 50
@@ -144,18 +147,21 @@ const PriceChart = ({ data, symbol, timeframe }) => {
     }, [toggles, allIndicators]);
 
     useEffect(() => {
-        if (!seriesRef.current.candles || !allIndicators) return;
+        if (!seriesRef.current.candles || !allIndicators || typeof seriesRef.current.candles.setMarkers !== 'function') return;
 
-        // Add markers for volume spikes
-        seriesRef.current.candles.setMarkers(
-            allIndicators.series.volumeSpikes.map(spike => ({
-                time: spike.time,
-                position: 'aboveBar',
-                color: '#0ea5e9',
-                shape: 'arrowDown',
-                text: 'WHALE',
-            }))
-        );
+        try {
+            seriesRef.current.candles.setMarkers(
+                allIndicators.series.volumeSpikes.map(spike => ({
+                    time: spike.time,
+                    position: 'aboveBar',
+                    color: '#0ea5e9',
+                    shape: 'arrowDown',
+                    text: 'WHALE',
+                }))
+            );
+        } catch (err) {
+            console.error("Error setting markers:", err);
+        }
     }, [allIndicators]);
 
     const toggleIndicator = (id) => {
