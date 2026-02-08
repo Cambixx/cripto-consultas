@@ -1,88 +1,57 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { BrainCircuit, Calculator as CalculatorIcon } from 'lucide-react';
+import { BrainCircuit } from 'lucide-react';
+
+// Hooks
+import { useMarketData } from './hooks/useMarketData';
+import { useGeminiAnalysis } from './hooks/useGeminiAnalysis';
+import { useLocalStorage } from './hooks/useLocalStorage';
+
+// Layout Components
+import Header from './components/layout/Header';
+import ControlBar from './components/layout/ControlBar';
+
+// Feature Components
 import GeminiInput from './components/GeminiInput';
-import CryptoSelector from './components/CryptoSelector';
-import TimeframeSelector from './components/TimeframeSelector';
 import AnalysisResult from './components/AnalysisResult';
 import PriceChart from './components/PriceChart';
-import FearAndGreed from './components/FearAndGreed';
 import StrategySelector from './components/StrategySelector';
 import RiskCalculator from './components/RiskCalculator';
-import { getTopCryptos, getCandleData, getGeminiAnalysis, getMultiTimeframeData } from './services/api';
-import { calculateIndicators } from './utils/indicators';
 
 const App = () => {
-  const [apiKey, setApiKey] = useState(import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('gemini_api_key') || '');
-  const [cryptos, setCryptos] = useState([]);
+  // Persistence
+  const [apiKey, setApiKey] = useLocalStorage('gemini_api_key', import.meta.env.VITE_GEMINI_API_KEY || '');
+  const [favorites, setFavorites] = useLocalStorage('crypto_favorites', []);
+
+  // UI State
   const [selectedCrypto, setSelectedCrypto] = useState(null);
   const [timeframe, setTimeframe] = useState('4h');
-  const [candles, setCandles] = useState([]);
-  const [marketSentiment, setMarketSentiment] = useState(null);
   const [strategy, setStrategy] = useState('trend_follower');
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
-  const [analysis, setAnalysis] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  useEffect(() => {
-    const fetchCryptos = async () => {
-      const data = await getTopCryptos();
-      setCryptos(data);
-    };
-    fetchCryptos();
-  }, []);
+  // Data & AI Hooks
+  const {
+    cryptos,
+    candles,
+    marketSentiment,
+    setMarketSentiment,
+    isLoading: isMarketLoading,
+    fetchMTFData
+  } = useMarketData(selectedCrypto, timeframe);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!selectedCrypto) return;
-      try {
-        const data = await getCandleData(selectedCrypto.symbol, timeframe);
-        setCandles(data);
-      } catch (e) {
-        console.error("Failed to fetch candles", e);
-      }
-    };
-    fetchData();
-  }, [selectedCrypto, timeframe]);
-
-  const handleApiKeySubmit = (key) => {
-    setApiKey(key);
-    localStorage.setItem('gemini_api_key', key);
-  };
+  const {
+    analysis,
+    isLoading: isAnalysisLoading,
+    error: analysisError,
+    runAnalysis
+  } = useGeminiAnalysis(apiKey);
 
   const handleAnalysis = async () => {
-    if (!apiKey || !selectedCrypto) return;
-    setIsLoading(true);
-    setError('');
-    setAnalysis('');
-
     try {
-      const mtfData = await getMultiTimeframeData(selectedCrypto.symbol, timeframe);
-      if (!mtfData.mtf.data.length) throw new Error('No se pudieron obtener datos del mercado.');
-      const indicators = calculateIndicators(mtfData.mtf.data);
-      const currentPrice = mtfData.mtf.data[mtfData.mtf.data.length - 1].close;
-      const htfIndicators = calculateIndicators(mtfData.htf.data);
-      const htfTrend = htfIndicators.ema200 && mtfData.htf.data.slice(-1)[0].close > htfIndicators.ema200 ? 'ALCISTA' : 'BAJISTA';
-      const fearAndGreedText = marketSentiment ? `${marketSentiment.value} (${marketSentiment.value_classification})` : 'Datos no disponibles';
-
-      const prompt = `
-        Actúa como un ${strategy === 'scalper' ? 'Scalper Agresivo' : strategy === 'mean_reversion' ? 'Trader de Reversión' : 'Trader Institucional de Tendencias'}.
-        Analiza ${selectedCrypto.symbol} con un enfoque de **Análisis Multi-Temporal (MTA)**:
-        1. **Tendencia Macro (${mtfData.htf.timeframe})**: ${htfTrend} (Precio vs EMA200).
-        2. **Estructura Actual (${mtfData.mtf.timeframe})**: Precio: ${currentPrice}, RSI: ${indicators.rsi.toFixed(2)}, MACD: ${indicators.macd.MACD?.toFixed(4)}.
-        3. **Micro-Estructura (${mtfData.ltf.timeframe})**: Cierre Reciente: ${mtfData.ltf.data.slice(-1)[0].close}.
-        Contexto Global: Sentimiento ${fearAndGreedText}, Estrategia ${strategy.toUpperCase()}.
-        ${marketSentiment?.value_classification === 'Neutral' ? '⚠️ ADVERTENCIA: Mercado Choppy.' : ''}
-        Genera un Plan de Trading detallado en ESPAÑOL resaltando Acción, Entrada, SL y TP.
-      `;
-
-      const result = await getGeminiAnalysis(apiKey, prompt);
-      setAnalysis(result);
+      const mtfData = await fetchMTFData();
+      await runAnalysis(selectedCrypto, strategy, mtfData, marketSentiment);
     } catch (err) {
-      setError(err.message || 'Ocurrió un error inesperado.');
-    } finally {
-      setIsLoading(false);
+      console.error("Analysis failed:", err);
     }
   };
 
@@ -113,57 +82,28 @@ const App = () => {
         animate="show"
         className="max-w-7xl mx-auto space-y-8"
       >
-        <header className="flex flex-col sm:flex-row justify-between items-center gap-6 py-4">
-          <motion.div variants={itemVariants} className="flex items-center gap-4">
-            <div className="p-3 bg-primary/10 rounded-2xl neo-shadow">
-              <BrainCircuit className="w-10 h-10 text-primary" />
-            </div>
-            <div className="text-left">
-              <h1 className="text-4xl font-bold tracking-tighter bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
-                CryptoOracle <span className="text-foreground/50 text-2xl font-light">PRO</span>
-              </h1>
-              <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mt-1">
-                Institutional MTA Intelligence
-              </p>
-            </div>
-          </motion.div>
-
-          <motion.div variants={itemVariants} className="flex items-center gap-4">
-            <FearAndGreed onValueChange={setMarketSentiment} />
-            <button
-              onClick={() => setIsCalculatorOpen(true)}
-              className="p-3 glass hover:bg-primary/10 text-primary rounded-xl transition-all neo-shadow group"
-              title="Risk Calculator"
-            >
-              <CalculatorIcon className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-            </button>
-          </motion.div>
-        </header>
+        <Header
+          onCalculatorOpen={() => setIsCalculatorOpen(true)}
+          setMarketSentiment={setMarketSentiment}
+          itemVariants={itemVariants}
+        />
 
         {!apiKey ? (
           <motion.div variants={itemVariants} className="max-w-md mx-auto pt-20">
-            <GeminiInput onApiKeySubmit={handleApiKeySubmit} />
+            <GeminiInput onApiKeySubmit={setApiKey} />
           </motion.div>
         ) : (
           <div className="space-y-8">
-            {/* Control Bar */}
-            <motion.div variants={itemVariants} className="glass p-4 rounded-2xl flex flex-col lg:flex-row gap-4 items-center">
-              <div className="flex-1 w-full flex flex-col sm:flex-row gap-4">
-                <CryptoSelector cryptos={cryptos} onSelect={setSelectedCrypto} />
-                <TimeframeSelector selected={timeframe} onSelect={setTimeframe} />
-              </div>
-              <button
-                onClick={() => {
-                  localStorage.removeItem('gemini_api_key');
-                  setApiKey('');
-                }}
-                className="text-xs font-mono text-muted-foreground hover:text-destructive px-4 opacity-50 hover:opacity-100 transition-all uppercase tracking-tighter"
-              >
-                Cerrar Sesión
-              </button>
-            </motion.div>
+            <ControlBar
+              cryptos={cryptos}
+              selectedCrypto={selectedCrypto}
+              setSelectedCrypto={setSelectedCrypto}
+              timeframe={timeframe}
+              setTimeframe={setTimeframe}
+              onLogout={() => setApiKey('')}
+              itemVariants={itemVariants}
+            />
 
-            {/* Chart Block */}
             <motion.div variants={itemVariants} className="w-full">
               {selectedCrypto && candles.length > 0 ? (
                 <div className="glass rounded-2xl neo-shadow p-6 border border-white/5">
@@ -174,13 +114,12 @@ const App = () => {
                   />
                 </div>
               ) : (
-                <div className="h-[400px] glass rounded-2xl flex items-center justify-center text-muted-foreground border-dashed border-2 border-white/5">
-                  Selecciona un activo para proyectar el gráfico
+                <div className="h-[400px] glass rounded-2xl flex items-center justify-center text-muted-foreground border-dashed border-2 border-white/5 font-mono text-sm uppercase tracking-widest">
+                  {isMarketLoading ? 'Sincronizando flujos de mercado...' : 'Selecciona un activo para proyectar el gráfico'}
                 </div>
               )}
             </motion.div>
 
-            {/* Strategy Selection */}
             <motion.div variants={itemVariants} className="glass p-6 sm:p-8 rounded-2xl space-y-8 neo-shadow border border-white/5">
               <StrategySelector selected={strategy} onSelect={setStrategy} />
 
@@ -188,10 +127,11 @@ const App = () => {
                 whileHover={{ scale: 1.01, boxShadow: "0 0 30px -10px hsla(199, 89%, 48%, 0.5)" }}
                 whileTap={{ scale: 0.99 }}
                 onClick={handleAnalysis}
-                disabled={!selectedCrypto || isLoading}
+                disabled={!selectedCrypto || isAnalysisLoading}
                 className="w-full bg-gradient-to-r from-blue-600 via-primary to-blue-400 text-white font-bold py-5 rounded-2xl shadow-xl transition-all disabled:opacity-50 text-xl tracking-tight relative overflow-hidden group"
               >
-                {isLoading ? (
+                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 slant" />
+                {isAnalysisLoading ? (
                   <span className="flex items-center justify-center gap-3">
                     <BrainCircuit className="w-7 h-7 animate-spin" />
                     Sincronizando con el Oráculo Pro...
@@ -202,9 +142,8 @@ const App = () => {
               </motion.button>
             </motion.div>
 
-            {/* Result Area */}
             <motion.div variants={itemVariants} className="w-full pb-20">
-              <AnalysisResult analysis={analysis} isLoading={isLoading} error={error} />
+              <AnalysisResult analysis={analysis} isLoading={isAnalysisLoading} error={analysisError} />
             </motion.div>
           </div>
         )}
