@@ -38,13 +38,19 @@ export const useGeminiAnalysis = (apiKey) => {
            - RSI: ${indicators.latest.rsi.toFixed(2)}
            - MACD: ${indicators.latest.macd.MACD?.toFixed(4)}
            - Bandas Bollinger: Rango ${indicators.latest.bb.lower?.toFixed(4)} - ${indicators.latest.bb.upper?.toFixed(4)}
-        3. **Micro-Estructura (${mtfData.ltf.timeframe})**:
-           - Cierre Reciente: ${mtfData.ltf.data.slice(-1)[0].close}
+        3. **Nuevas Métricas PRO**:
+           - **Régimen de Mercado**: ${indicators.latest.regime.replace('_', ' ')}
+           - **Divergencias RSI**: ${indicators.latest.divergence.replace('_', ' ')}
+           - **Micro-Estructura (${mtfData.ltf.timeframe})**: Cierre Reciente: ${mtfData.ltf.data.slice(-1)[0].close}
         
         Contexto Global: Sentimiento ${fearAndGreedText}, Estrategia ${strategy.toUpperCase()}.
-        ${marketSentiment?.value_classification === 'Neutral' ? '⚠️ ADVERTENCIA: Mercado Choppy.' : ''}
+        ${indicators.latest.divergence !== 'NONE' ? `🔥 IMPORTANTE: Se ha detectado una ${indicators.latest.divergence}.` : ''}
+        ${indicators.latest.regime.includes('STRONG') ? `🚀 ALERTA: Tendencia extremadamente fuerte detectada.` : ''}
         
-        Genera un Plan de Trading detallado en ESPAÑOL resaltando Acción, Entrada, SL y TP.
+        Genera un Plan de Trading detallado en ESPAÑOL resaltando:
+        - **Diagnóstico MTA & Alpha**: Confluencia entre régimen, divergencias y tendencia HTF.
+        - **Plan de Ejecución**: Entrada, SL y TP dinámicos.
+        - **Escenario de Invalidación**: ¿Cuándo dejaría de ser válido el setup?
       `;
 
             const result = await getGeminiAnalysis(apiKey, prompt);

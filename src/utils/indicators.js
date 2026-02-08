@@ -44,6 +44,38 @@ export const calculateIndicators = (candles) => {
         time, value: ema200Values[i]
     }));
 
+    // Market Regime Detection
+    const latestPrice = closePrices[closePrices.length - 1];
+    const latestEMA50 = ema50Values[ema50Values.length - 1];
+    const latestEMA200 = ema200Values[ema200Values.length - 1];
+
+    let regime = 'NEUTRAL';
+    if (latestEMA50 && latestEMA200) {
+        const gap = (latestEMA50 - latestEMA200) / latestEMA200;
+        if (latestPrice > latestEMA200 && latestEMA50 > latestEMA200) {
+            regime = gap > 0.02 ? 'STRONG_BULLISH' : 'BULLISH';
+        } else if (latestPrice < latestEMA200 && latestEMA50 < latestEMA200) {
+            regime = gap < -0.02 ? 'STRONG_BEARISH' : 'BEARISH';
+        } else {
+            regime = 'RANGING';
+        }
+    }
+
+    // RSI Divergence Detection (Simplified)
+    let divergence = 'NONE';
+    if (rsiValues.length > 20) {
+        const lastRSI = rsiValues[rsiValues.length - 1];
+        const prevRSI = rsiValues[rsiValues.length - 10]; // looking back a bit
+        const lastPrice = closePrices[closePrices.length - 1];
+        const prevPrice = closePrices[closePrices.length - 10];
+
+        if (lastPrice < prevPrice && lastRSI > prevRSI && lastRSI < 40) {
+            divergence = 'BULLISH_DIVERGENCE';
+        } else if (lastPrice > prevPrice && lastRSI < prevRSI && lastRSI > 60) {
+            divergence = 'BEARISH_DIVERGENCE';
+        }
+    }
+
     return {
         latest: {
             rsi: rsiValues.slice(-1)[0] || 0,
@@ -51,6 +83,8 @@ export const calculateIndicators = (candles) => {
             bb: bbValues.slice(-1)[0] || { upper: 0, lower: 0, middle: 0 },
             ema50: ema50Values.slice(-1)[0] || 0,
             ema200: ema200Values.slice(-1)[0] || 0,
+            regime,
+            divergence
         },
         series: {
             rsi: rsiSeries,
@@ -61,4 +95,5 @@ export const calculateIndicators = (candles) => {
         }
     };
 };
+
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { BrainCircuit } from 'lucide-react';
 
@@ -10,6 +10,7 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 // Layout Components
 import Header from './components/layout/Header';
 import ControlBar from './components/layout/ControlBar';
+import AnalysisHistory from './components/layout/AnalysisHistory';
 
 // Feature Components
 import GeminiInput from './components/GeminiInput';
@@ -22,12 +23,14 @@ const App = () => {
   // Persistence
   const [apiKey, setApiKey] = useLocalStorage('gemini_api_key', import.meta.env.VITE_GEMINI_API_KEY || '');
   const [favorites, setFavorites] = useLocalStorage('crypto_favorites', []);
+  const [history, setHistory] = useLocalStorage('analysis_history', []);
 
   // UI State
   const [selectedCrypto, setSelectedCrypto] = useState(null);
   const [timeframe, setTimeframe] = useState('4h');
   const [strategy, setStrategy] = useState('trend_follower');
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   // Data & AI Hooks
   const {
@@ -41,19 +44,58 @@ const App = () => {
 
   const {
     analysis,
+    setAnalysis,
     isLoading: isAnalysisLoading,
     error: analysisError,
     runAnalysis
   } = useGeminiAnalysis(apiKey);
 
-  const handleAnalysis = async () => {
+  const handleAnalysis = useCallback(async () => {
+    if (!selectedCrypto || !apiKey) return;
     try {
       const mtfData = await fetchMTFData();
-      await runAnalysis(selectedCrypto, strategy, mtfData, marketSentiment);
+      const result = await runAnalysis(selectedCrypto, strategy, mtfData, marketSentiment);
+
+      if (result) {
+        setHistory(prev => [{
+          id: Date.now(),
+          symbol: selectedCrypto.symbol,
+          timeframe,
+          strategy,
+          result: result,
+          timestamp: new Date().toISOString()
+        }, ...prev].slice(0, 10));
+      }
     } catch (err) {
       console.error("Analysis failed:", err);
     }
+  }, [selectedCrypto, apiKey, timeframe, strategy, marketSentiment, fetchMTFData, runAnalysis, setHistory]);
+
+  const toggleFavorite = (symbol) => {
+    setFavorites(prev =>
+      prev.includes(symbol)
+        ? prev.filter(s => s !== symbol)
+        : [...prev, symbol]
+    );
   };
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Space to Analyze
+      if (e.code === 'Space' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleAnalysis();
+      }
+      // H to open History
+      if (e.key === 'h' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        setIsHistoryOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleAnalysis]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -74,6 +116,14 @@ const App = () => {
         isOpen={isCalculatorOpen}
         onClose={() => setIsCalculatorOpen(false)}
         currentPrice={candles[candles.length - 1]?.close}
+      />
+
+      <AnalysisHistory
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        history={history}
+        onSelect={setAnalysis}
+        onClear={() => setHistory([])}
       />
 
       <motion.div
@@ -100,7 +150,13 @@ const App = () => {
               setSelectedCrypto={setSelectedCrypto}
               timeframe={timeframe}
               setTimeframe={setTimeframe}
-              onLogout={() => setApiKey('')}
+              favorites={favorites}
+              toggleFavorite={toggleFavorite}
+              onHistoryOpen={() => setIsHistoryOpen(true)}
+              onLogout={() => {
+                localStorage.removeItem('gemini_api_key');
+                setApiKey('');
+              }}
               itemVariants={itemVariants}
             />
 
@@ -114,8 +170,19 @@ const App = () => {
                   />
                 </div>
               ) : (
-                <div className="h-[400px] glass rounded-2xl flex items-center justify-center text-muted-foreground border-dashed border-2 border-white/5 font-mono text-sm uppercase tracking-widest">
-                  {isMarketLoading ? 'Sincronizando flujos de mercado...' : 'Selecciona un activo para proyectar el gráfico'}
+                <div className="h-[400px] glass rounded-2xl flex items-center justify-center text-muted-foreground border-dashed border-2 border-white/5 font-mono text-sm uppercase tracking-widest text-center px-8">
+                  {isMarketLoading ? (
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="w-12 h-1 bg-white/5 rounded-full overflow-hidden">
+                        <motion.div
+                          animate={{ x: [-48, 48] }}
+                          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                          className="w-12 h-full bg-primary"
+                        />
+                      </div>
+                      Sincronizando flujos de mercado...
+                    </div>
+                  ) : 'Selecciona un activo para proyectar el gráfico'}
                 </div>
               )}
             </motion.div>
