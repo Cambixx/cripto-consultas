@@ -1,25 +1,54 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Bot, AlertTriangle, TrendingUp } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Bot, AlertTriangle, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import copy from 'copy-to-clipboard';
 
 const AnalysisResult = ({ analysis, isLoading, error }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        if (analysis) {
+            copy(analysis);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
     if (isLoading) {
         return (
-            <div className="w-full max-w-2xl mx-auto p-8 text-center">
-                <div className="animate-spin w-12 h-12 border-4 border-accent border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p className="text-muted-foreground animate-pulse">Consulting the oracle...</p>
-            </div>
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="w-full max-w-4xl mx-auto p-12 text-center space-y-4"
+            >
+                <div className="relative w-16 h-16 mx-auto">
+                    <div className="absolute inset-0 border-4 border-primary/20 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <p className="text-xl font-bold bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent italic">
+                        Consultando el Oráculo Digital...
+                    </p>
+                    <p className="text-muted-foreground text-sm font-mono animate-pulse">
+                        Calculando confluencias MTA y estructuras de mercado...
+                    </p>
+                </div>
+            </motion.div>
         );
     }
 
     if (error) {
         return (
-            <div className="w-full max-w-2xl mx-auto p-6 bg-destructive/10 border border-destructive/20 rounded-xl text-center">
-                <AlertTriangle className="w-10 h-10 text-destructive mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-destructive mb-2">Analysis Failed</h3>
-                <p className="text-destructive-foreground/80">{error}</p>
-            </div>
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="w-full max-w-4xl mx-auto p-6 bg-destructive/5 border border-destructive/20 rounded-2xl text-center"
+            >
+                <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-3" />
+                <h3 className="text-xl font-bold text-destructive mb-2">Error de Análisis</h3>
+                <p className="text-destructive-foreground/80 max-w-md mx-auto">{error}</p>
+            </motion.div>
         );
     }
 
@@ -27,21 +56,58 @@ const AnalysisResult = ({ analysis, isLoading, error }) => {
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-3xl mx-auto bg-card border border-border rounded-xl shadow-2xl overflow-hidden"
+            className="w-full max-w-5xl mx-auto glass rounded-2xl neo-shadow overflow-hidden border border-white/10"
         >
-            <div className="bg-accent/10 p-4 border-b border-border flex items-center gap-2">
-                <Bot className="w-5 h-5 text-accent" />
-                <h2 className="font-bold text-lg text-foreground">AI Market Analysis</h2>
+            <div className="bg-primary/5 p-4 sm:p-6 border-b border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                        <Bot className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                        <h2 className="font-bold text-xl tracking-tight">Plan de Trading IA</h2>
+                        <p className="text-xs text-muted-foreground font-mono">Generado por Gemini Pro • MTF Analysis Engine</p>
+                    </div>
+                </div>
+
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleCopy}
+                    className={`
+                        flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-sm font-medium
+                        ${copied
+                            ? 'bg-green-500/10 border-green-500/50 text-green-400'
+                            : 'bg-white/5 border-white/10 hover:bg-white/10 text-foreground'}
+                    `}
+                >
+                    {copied ? (
+                        <>
+                            <Check className="w-4 h-4" /> Copiado!
+                        </>
+                    ) : (
+                        <>
+                            <Copy className="w-4 h-4" /> Copiar Plan
+                        </>
+                    )}
+                </motion.button>
             </div>
 
-            <div className="p-6 prose prose-invert max-w-none prose-headings:text-accent prose-a:text-blue-400">
+            <div className="p-6 sm:p-8 prose prose-invert max-w-none 
+                prose-headings:text-primary prose-headings:font-bold prose-headings:tracking-tight
+                prose-p:text-foreground/90 prose-p:leading-relaxed
+                prose-strong:text-primary prose-strong:font-bold
+                prose-code:text-primary prose-code:bg-primary/5 prose-code:px-1 prose-code:rounded
+                prose-ul:list-disc prose-li:text-foreground/80
+            ">
                 <ReactMarkdown>{analysis}</ReactMarkdown>
             </div>
 
-            <div className="bg-background/50 p-4 border-t border-border text-center text-xs text-muted-foreground">
-                Generated by Google Gemini • Not financial advice
+            <div className="bg-black/20 p-4 border-t border-white/5 text-center px-6">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-medium leading-relaxed">
+                    Disclaimer: El trading de criptomonedas conlleva un alto riesgo. Este análisis es experimental y no constituye asesoría financiera. Opera bajo tu propio riesgo.
+                </p>
             </div>
         </motion.div>
     );

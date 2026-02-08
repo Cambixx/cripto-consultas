@@ -33,7 +33,6 @@ const App = () => {
     fetchCryptos();
   }, []);
 
-  // Auto-fetch candles when selection changes
   useEffect(() => {
     const fetchData = async () => {
       if (!selectedCrypto) return;
@@ -54,81 +53,54 @@ const App = () => {
 
   const handleAnalysis = async () => {
     if (!apiKey || !selectedCrypto) return;
-
     setIsLoading(true);
     setError('');
     setAnalysis('');
 
     try {
-      // 1. Fetch Multi-Timeframe Data
       const mtfData = await getMultiTimeframeData(selectedCrypto.symbol, timeframe);
-
-      if (!mtfData.mtf.data.length) {
-        throw new Error('No se pudieron obtener datos del mercado.');
-      }
-
-      // 2. Calculate Indicators for Current Timeframe (MTF)
+      if (!mtfData.mtf.data.length) throw new Error('No se pudieron obtener datos del mercado.');
       const indicators = calculateIndicators(mtfData.mtf.data);
       const currentPrice = mtfData.mtf.data[mtfData.mtf.data.length - 1].close;
-
-      // Calculate HTF Trend (Simple Check: Price vs EMA200 on HTF)
       const htfIndicators = calculateIndicators(mtfData.htf.data);
       const htfTrend = htfIndicators.ema200 && mtfData.htf.data.slice(-1)[0].close > htfIndicators.ema200 ? 'ALCISTA' : 'BAJISTA';
+      const fearAndGreedText = marketSentiment ? `${marketSentiment.value} (${marketSentiment.value_classification})` : 'Datos no disponibles';
 
-      const fearAndGreedText = marketSentiment
-        ? `${marketSentiment.value} (${marketSentiment.value_classification})`
-        : 'Datos no disponibles';
-
-      // 3. Construct Context-Aware Prompt
       const prompt = `
         Actúa como un ${strategy === 'scalper' ? 'Scalper Agresivo' : strategy === 'mean_reversion' ? 'Trader de Reversión' : 'Trader Institucional de Tendencias'}.
-        
         Analiza ${selectedCrypto.symbol} con un enfoque de **Análisis Multi-Temporal (MTA)**:
-        
         1. **Tendencia Macro (${mtfData.htf.timeframe})**: ${htfTrend} (Precio vs EMA200).
-        2. **Estructura Actual (${mtfData.mtf.timeframe})**:
-           - Precio: ${currentPrice}
-           - RSI (14): ${indicators.rsi.toFixed(2)}
-           - MACD: ${indicators.macd.MACD?.toFixed(4)}
-           - Bandas Bollinger: Rango ${indicators.bb.lower?.toFixed(4)} - ${indicators.bb.upper?.toFixed(4)}
-        3. **Micro-Estructura (${mtfData.ltf.timeframe})**:
-           - Cierre Reciente: ${mtfData.ltf.data.slice(-1)[0].close}
-        
-        **Contexto Global**:
-        - Sentimiento: ${fearAndGreedText}
-        - Estrategia Seleccionada: ${strategy.toUpperCase()}
-        
-        **Instrucciones**:
-        ${marketSentiment?.value_classification === 'Neutral' ? '⚠️ ADVERTENCIA: Mercado sin dirección clara (Choppy). Prioriza la preservación de capital.' : ''}
-        
-        Genera un Plan de Trading detallado en ESPAÑOL:
-        
-        1. **Diagnóstico MTA**: ¿Están alineadas la tendencia Macro y Micro?
-        2. **Estrategia Ejecutable**:
-           - **Dirección**: LONG / SHORT / ESPERAR
-           - **Zona de Entrada**: Precio exacto o confirmación necesaria en ${mtfData.ltf.timeframe}.
-           - **Stop Loss**: Nivel técnico (Soporte/Resistencia).
-           - **Take Profit**: Objetivos logicos.
-        3. **Gestión de Riesgo**:
-           - Sugerencia de tamaño de posición (Conservador/Agresivo) dada la confianza del setup.
-        
-        Sé directo, profesional y evita la ambigüedad.
+        2. **Estructura Actual (${mtfData.mtf.timeframe})**: Precio: ${currentPrice}, RSI: ${indicators.rsi.toFixed(2)}, MACD: ${indicators.macd.MACD?.toFixed(4)}.
+        3. **Micro-Estructura (${mtfData.ltf.timeframe})**: Cierre Reciente: ${mtfData.ltf.data.slice(-1)[0].close}.
+        Contexto Global: Sentimiento ${fearAndGreedText}, Estrategia ${strategy.toUpperCase()}.
+        ${marketSentiment?.value_classification === 'Neutral' ? '⚠️ ADVERTENCIA: Mercado Choppy.' : ''}
+        Genera un Plan de Trading detallado en ESPAÑOL resaltando Acción, Entrada, SL y TP.
       `;
 
-      // Call Gemini
       const result = await getGeminiAnalysis(apiKey, prompt);
       setAnalysis(result);
-
     } catch (err) {
-      console.error(err);
       setError(err.message || 'Ocurrió un error inesperado.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
+
   return (
-    <div className="min-h-screen bg-background text-foreground p-6 font-sans selection:bg-accent selection:text-accent-foreground">
+    <div className="min-h-screen p-4 sm:p-8">
       <RiskCalculator
         isOpen={isCalculatorOpen}
         onClose={() => setIsCalculatorOpen(false)}
@@ -136,107 +108,104 @@ const App = () => {
       />
 
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-7xl mx-auto"
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="max-w-7xl mx-auto space-y-8"
       >
-        <header className="text-center mb-10 pt-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <BrainCircuit className="w-10 h-10 text-accent" />
-            <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 to-accent bg-clip-text text-transparent">
-              CryptoOracle Pro
-            </h1>
-          </div>
-          <p className="text-muted-foreground text-lg">
-            Institutional-Grade Multi-Timeframe Analysis
-          </p>
+        <header className="flex flex-col sm:flex-row justify-between items-center gap-6 py-4">
+          <motion.div variants={itemVariants} className="flex items-center gap-4">
+            <div className="p-3 bg-primary/10 rounded-2xl neo-shadow">
+              <BrainCircuit className="w-10 h-10 text-primary" />
+            </div>
+            <div className="text-left">
+              <h1 className="text-4xl font-bold tracking-tighter bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
+                CryptoOracle <span className="text-foreground/50 text-2xl font-light">PRO</span>
+              </h1>
+              <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mt-1">
+                Institutional MTA Intelligence
+              </p>
+            </div>
+          </motion.div>
+
+          <motion.div variants={itemVariants} className="flex items-center gap-4">
+            <FearAndGreed onValueChange={setMarketSentiment} />
+            <button
+              onClick={() => setIsCalculatorOpen(true)}
+              className="p-3 glass hover:bg-primary/10 text-primary rounded-xl transition-all neo-shadow group"
+              title="Risk Calculator"
+            >
+              <CalculatorIcon className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+            </button>
+          </motion.div>
         </header>
 
         {!apiKey ? (
-          <div className="max-w-md mx-auto">
+          <motion.div variants={itemVariants} className="max-w-md mx-auto pt-20">
             <GeminiInput onApiKeySubmit={handleApiKeySubmit} />
-          </div>
+          </motion.div>
         ) : (
-          <div className="space-y-6">
-            {/* Top Control Bar */}
-            <div className="bg-card border border-border p-4 rounded-xl shadow-lg flex flex-col lg:flex-row items-center justify-between gap-4">
-              <div className="w-full lg:w-auto flex flex-col sm:flex-row gap-4 flex-1">
-                <div className="flex-1 min-w-[200px]">
-                  <CryptoSelector cryptos={cryptos} onSelect={setSelectedCrypto} />
-                </div>
-                <div className="min-w-[150px]">
-                  <TimeframeSelector selected={timeframe} onSelect={setTimeframe} />
-                </div>
+          <div className="space-y-8">
+            {/* Control Bar */}
+            <motion.div variants={itemVariants} className="glass p-4 rounded-2xl flex flex-col lg:flex-row gap-4 items-center">
+              <div className="flex-1 w-full flex flex-col sm:flex-row gap-4">
+                <CryptoSelector cryptos={cryptos} onSelect={setSelectedCrypto} />
+                <TimeframeSelector selected={timeframe} onSelect={setTimeframe} />
               </div>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('gemini_api_key');
+                  setApiKey('');
+                }}
+                className="text-xs font-mono text-muted-foreground hover:text-destructive px-4 opacity-50 hover:opacity-100 transition-all uppercase tracking-tighter"
+              >
+                Cerrar Sesión
+              </button>
+            </motion.div>
 
-              <div className="flex items-center gap-4 w-full lg:w-auto justify-end">
-                <FearAndGreed onValueChange={setMarketSentiment} />
-                <button
-                  onClick={() => setIsCalculatorOpen(true)}
-                  className="p-3 bg-accent/10 hover:bg-accent/20 text-accent rounded-lg border border-accent/20 transition-colors"
-                  title="Risk Calculator"
-                >
-                  <CalculatorIcon className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => {
-                    localStorage.removeItem('gemini_api_key');
-                    setApiKey('');
-                  }}
-                  className="text-xs text-muted-foreground hover:text-destructive transition-colors whitespace-nowrap"
-                >
-                  Salir
-                </button>
-              </div>
-            </div>
-
-            {/* Price Chart - Full Width */}
-            <div className="w-full">
+            {/* Chart Block */}
+            <motion.div variants={itemVariants} className="w-full">
               {selectedCrypto && candles.length > 0 ? (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="w-full min-h-[500px]"
-                >
+                <div className="glass rounded-2xl neo-shadow p-6 border border-white/5">
                   <PriceChart
                     data={candles}
                     symbol={selectedCrypto.symbol}
                     timeframe={timeframe}
                   />
-                </motion.div>
+                </div>
               ) : (
-                <div className="h-[400px] bg-card/50 border border-border/50 rounded-xl flex items-center justify-center text-muted-foreground">
-                  Selecciona una criptomoneda para ver el gráfico
+                <div className="h-[400px] glass rounded-2xl flex items-center justify-center text-muted-foreground border-dashed border-2 border-white/5">
+                  Selecciona un activo para proyectar el gráfico
                 </div>
               )}
-            </div>
+            </motion.div>
 
-            {/* Strategy Selection & Action - Full Width */}
-            <div className="bg-card border border-border p-6 rounded-xl shadow-lg space-y-6">
+            {/* Strategy Selection */}
+            <motion.div variants={itemVariants} className="glass p-6 sm:p-8 rounded-2xl space-y-8 neo-shadow border border-white/5">
               <StrategySelector selected={strategy} onSelect={setStrategy} />
 
               <motion.button
-                whileHover={{ scale: 1.01 }}
+                whileHover={{ scale: 1.01, boxShadow: "0 0 30px -10px hsla(199, 89%, 48%, 0.5)" }}
                 whileTap={{ scale: 0.99 }}
                 onClick={handleAnalysis}
                 disabled={!selectedCrypto || isLoading}
-                className="w-full bg-gradient-to-r from-blue-600 to-accent text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-accent/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+                className="w-full bg-gradient-to-r from-blue-600 via-primary to-blue-400 text-white font-bold py-5 rounded-2xl shadow-xl transition-all disabled:opacity-50 text-xl tracking-tight relative overflow-hidden group"
               >
                 {isLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <BrainCircuit className="w-6 h-6 animate-pulse" />
-                    Analizando Tendencia Macro (1D), Estructura (4H) y Entrada ({timeframe})...
+                  <span className="flex items-center justify-center gap-3">
+                    <BrainCircuit className="w-7 h-7 animate-spin" />
+                    Sincronizando con el Oráculo Pro...
                   </span>
                 ) : (
-                  'Ejecutar Análisis Profesional Multi-Temporal'
+                  'ANALIZAR MULTI-TEMPORALIDAD AHORA'
                 )}
               </motion.button>
-            </div>
+            </motion.div>
 
-            {/* Analysis Result - Full Width */}
-            <div className="w-full">
+            {/* Result Area */}
+            <motion.div variants={itemVariants} className="w-full pb-20">
               <AnalysisResult analysis={analysis} isLoading={isLoading} error={error} />
-            </div>
+            </motion.div>
           </div>
         )}
       </motion.div>
