@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Search, Star, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const CryptoSelector = ({ cryptos, onSelect, favorites = [], toggleFavorite }) => {
+const CryptoSelector = ({ cryptos, onSelect, favorites = [], toggleFavorite, placeholder = "Buscar activo..." }) => {
     const [search, setSearch] = useState('');
     const [isOpen, setIsOpen] = useState(false);
     const [selectedCrypto, setSelectedCrypto] = useState(null);
@@ -36,7 +36,7 @@ const CryptoSelector = ({ cryptos, onSelect, favorites = [], toggleFavorite }) =
                                 </span>
                             </div>
                         ) : (
-                            <span className="text-muted-foreground text-sm font-medium">Buscar activo...</span>
+                            <span className="text-muted-foreground text-sm font-medium">{placeholder}</span>
                         )}
                     </div>
                     <Search className={`w-4 h-4 transition-colors ${isOpen ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'}`} />

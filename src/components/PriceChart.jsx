@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createChart, ColorType, CandlestickSeries, LineSeries } from 'lightweight-charts';
 import { calculateIndicators } from '../utils/indicators';
+import { Sparkles } from 'lucide-react';
 
 const PriceChart = ({ data, symbol, timeframe }) => {
     const chartContainerRef = useRef();
@@ -80,10 +81,15 @@ const PriceChart = ({ data, symbol, timeframe }) => {
         };
     }, [data]);
 
+    // Memoized indicator calculations
+    const allIndicators = React.useMemo(() => {
+        if (!data.length) return null;
+        return calculateIndicators(data);
+    }, [data]);
+
     useEffect(() => {
-        if (!chartRef.current || !data.length) return;
+        if (!chartRef.current || !allIndicators) return;
         const chart = chartRef.current;
-        const indicators = calculateIndicators(data);
 
         // EMA 50
         if (toggles.ema50) {
@@ -92,7 +98,7 @@ const PriceChart = ({ data, symbol, timeframe }) => {
                     color: '#3b82f6', lineWidth: 1, priceLineVisible: false,
                 });
             }
-            seriesRef.current.ema50.setData(indicators.series.ema50);
+            seriesRef.current.ema50.setData(allIndicators.series.ema50);
         } else if (seriesRef.current.ema50) {
             chart.removeSeries(seriesRef.current.ema50);
             seriesRef.current.ema50 = null;
@@ -105,7 +111,7 @@ const PriceChart = ({ data, symbol, timeframe }) => {
                     color: '#a855f7', lineWidth: 1.5, priceLineVisible: false,
                 });
             }
-            seriesRef.current.ema200.setData(indicators.series.ema200);
+            seriesRef.current.ema200.setData(allIndicators.series.ema200);
         } else if (seriesRef.current.ema200) {
             chart.removeSeries(seriesRef.current.ema200);
             seriesRef.current.ema200 = null;
@@ -124,9 +130,9 @@ const PriceChart = ({ data, symbol, timeframe }) => {
                     color: 'rgba(234, 179, 8, 0.2)', lineWidth: 1, priceLineVisible: false,
                 });
             }
-            seriesRef.current.bbUpper.setData(indicators.series.bb.map(b => ({ time: b.time, value: b.upper })));
-            seriesRef.current.bbLower.setData(indicators.series.bb.map(b => ({ time: b.time, value: b.lower })));
-            seriesRef.current.bbMiddle.setData(indicators.series.bb.map(b => ({ time: b.time, value: b.middle })));
+            seriesRef.current.bbUpper.setData(allIndicators.series.bb.map(b => ({ time: b.time, value: b.upper })));
+            seriesRef.current.bbLower.setData(allIndicators.series.bb.map(b => ({ time: b.time, value: b.lower })));
+            seriesRef.current.bbMiddle.setData(allIndicators.series.bb.map(b => ({ time: b.time, value: b.middle })));
         } else if (seriesRef.current.bbUpper) {
             chart.removeSeries(seriesRef.current.bbUpper);
             chart.removeSeries(seriesRef.current.bbLower);
@@ -135,18 +141,41 @@ const PriceChart = ({ data, symbol, timeframe }) => {
             seriesRef.current.bbLower = null;
             seriesRef.current.bbMiddle = null;
         }
-    }, [toggles, data]);
+    }, [toggles, allIndicators]);
+
+    useEffect(() => {
+        if (!seriesRef.current.candles || !allIndicators) return;
+
+        // Add markers for volume spikes
+        seriesRef.current.candles.setMarkers(
+            allIndicators.series.volumeSpikes.map(spike => ({
+                time: spike.time,
+                position: 'aboveBar',
+                color: '#0ea5e9',
+                shape: 'arrowDown',
+                text: 'WHALE',
+            }))
+        );
+    }, [allIndicators]);
 
     const toggleIndicator = (id) => {
         setToggles(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
+    const latestIndicators = allIndicators;
+
     return (
         <div className="w-full space-y-4 relative">
-            {/* RSI Badge Overlay */}
-            {data.length > 0 && (
+            {/* Overlay Indicators */}
+            {latestIndicators && (
                 <div className="absolute top-16 right-4 z-10 flex flex-col items-end gap-2">
-                    <RSIBadge value={calculateIndicators(data).latest.rsi} />
+                    <RSIBadge value={latestIndicators.latest.rsi} />
+                    {latestIndicators.latest.isWhaleActivity && (
+                        <div className="px-3 py-1.5 rounded-lg border border-blue-400/20 bg-blue-400/10 text-blue-400 backdrop-blur-md flex items-center gap-2 neo-shadow animate-pulse">
+                            <Sparkles className="w-4 h-4" />
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest">Whale Activity Detected</span>
+                        </div>
+                    )}
                 </div>
             )}
 

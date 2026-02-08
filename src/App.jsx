@@ -27,10 +27,12 @@ const App = () => {
 
   // UI State
   const [selectedCrypto, setSelectedCrypto] = useState(null);
+  const [compareCrypto, setCompareCrypto] = useState(null);
   const [timeframe, setTimeframe] = useState('4h');
   const [strategy, setStrategy] = useState('trend_follower');
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isSplitView, setIsSplitView] = useState(false);
 
   // Data & AI Hooks
   const {
@@ -41,6 +43,11 @@ const App = () => {
     isLoading: isMarketLoading,
     fetchMTFData
   } = useMarketData(selectedCrypto, timeframe);
+
+  const {
+    candles: compareCandles,
+    isLoading: isCompareLoading,
+  } = useMarketData(compareCrypto, timeframe);
 
   const {
     analysis,
@@ -148,6 +155,10 @@ const App = () => {
               cryptos={cryptos}
               selectedCrypto={selectedCrypto}
               setSelectedCrypto={setSelectedCrypto}
+              compareCrypto={compareCrypto}
+              setCompareCrypto={setCompareCrypto}
+              isSplitView={isSplitView}
+              setIsSplitView={setIsSplitView}
               timeframe={timeframe}
               setTimeframe={setTimeframe}
               favorites={favorites}
@@ -160,29 +171,36 @@ const App = () => {
               itemVariants={itemVariants}
             />
 
-            <motion.div variants={itemVariants} className="w-full">
-              {selectedCrypto && candles.length > 0 ? (
-                <div className="glass rounded-2xl neo-shadow p-6 border border-white/5">
+            <motion.div variants={itemVariants} className={`grid gap-6 ${isSplitView ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
+              {/* Main Chart */}
+              <div className="glass rounded-2xl neo-shadow p-6 border border-white/5 order-1">
+                {selectedCrypto && candles.length > 0 ? (
                   <PriceChart
                     data={candles}
                     symbol={selectedCrypto.symbol}
                     timeframe={timeframe}
                   />
-                </div>
-              ) : (
-                <div className="h-[400px] glass rounded-2xl flex items-center justify-center text-muted-foreground border-dashed border-2 border-white/5 font-mono text-sm uppercase tracking-widest text-center px-8">
-                  {isMarketLoading ? (
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="w-12 h-1 bg-white/5 rounded-full overflow-hidden">
-                        <motion.div
-                          animate={{ x: [-48, 48] }}
-                          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                          className="w-12 h-full bg-primary"
-                        />
-                      </div>
-                      Sincronizando flujos de mercado...
+                ) : (
+                  <div className="h-[400px] flex items-center justify-center text-muted-foreground border-dashed border-2 border-white/5 rounded-xl font-mono text-xs uppercase tracking-widest text-center px-8">
+                    {isMarketLoading ? 'Sincronizando flujos...' : 'Carga un activo principal'}
+                  </div>
+                )}
+              </div>
+
+              {/* Comparison Chart */}
+              {isSplitView && (
+                <div className="glass rounded-2xl neo-shadow p-6 border border-white/5 order-2">
+                  {compareCrypto && compareCandles.length > 0 ? (
+                    <PriceChart
+                      data={compareCandles}
+                      symbol={compareCrypto.symbol}
+                      timeframe={timeframe}
+                    />
+                  ) : (
+                    <div className="h-[400px] flex items-center justify-center text-muted-foreground border-dashed border-2 border-white/5 rounded-xl font-mono text-xs uppercase tracking-widest text-center px-8">
+                      {isCompareLoading ? 'Analizando liquidez...' : 'Carga un activo para comparar'}
                     </div>
-                  ) : 'Selecciona un activo para proyectar el gráfico'}
+                  )}
                 </div>
               )}
             </motion.div>

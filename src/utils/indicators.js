@@ -76,6 +76,23 @@ export const calculateIndicators = (candles) => {
         }
     }
 
+    // Volume Analysis
+    const volumes = candles.map(c => c.volume);
+    const volumeSpikes = [];
+    const volPeriod = 20;
+
+    for (let i = volPeriod; i < volumes.length; i++) {
+        const slice = volumes.slice(i - volPeriod, i);
+        const avg = slice.reduce((a, b) => a + b, 0) / volPeriod;
+        if (volumes[i] > avg * 2.5) {
+            volumeSpikes.push({
+                time: times[i],
+                value: volumes[i],
+                ratio: volumes[i] / avg
+            });
+        }
+    }
+
     return {
         latest: {
             rsi: rsiValues.slice(-1)[0] || 0,
@@ -84,7 +101,8 @@ export const calculateIndicators = (candles) => {
             ema50: ema50Values.slice(-1)[0] || 0,
             ema200: ema200Values.slice(-1)[0] || 0,
             regime,
-            divergence
+            divergence,
+            isWhaleActivity: volumeSpikes.length > 0 && volumeSpikes.slice(-1)[0].time === times[times.length - 1]
         },
         series: {
             rsi: rsiSeries,
@@ -92,8 +110,10 @@ export const calculateIndicators = (candles) => {
             bb: bbSeries,
             ema50: ema50Series,
             ema200: ema200Series,
+            volumeSpikes
         }
     };
 };
+
 
 

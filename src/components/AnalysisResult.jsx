@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, AlertTriangle, Copy, Check } from 'lucide-react';
+import { Bot, AlertTriangle, Copy, Check, FileText, Download, RefreshCcw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import copy from 'copy-to-clipboard';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const AnalysisResult = ({ analysis, isLoading, error }) => {
     const [copied, setCopied] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
 
     const handleCopy = () => {
         if (analysis) {
@@ -15,7 +18,34 @@ const AnalysisResult = ({ analysis, isLoading, error }) => {
         }
     };
 
+    const handleExport = async () => {
+        const element = document.getElementById('analysis-report');
+        if (!element) return;
+
+        setIsExporting(true);
+        try {
+            const canvas = await html2canvas(element, {
+                backgroundColor: '#020617', // Match --background
+                scale: 2,
+            });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = pageWidth - 20;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            pdf.save(`CryptoOracle_Report_${Date.now()}.pdf`);
+        } catch (err) {
+            console.error("Export failed:", err);
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     if (isLoading) {
+        // ... same loading state ...
         return (
             <motion.div
                 initial={{ opacity: 0 }}
@@ -71,30 +101,43 @@ const AnalysisResult = ({ analysis, isLoading, error }) => {
                     </div>
                 </div>
 
-                <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleCopy}
-                    className={`
-                        flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-sm font-medium
-                        ${copied
-                            ? 'bg-green-500/10 border-green-500/50 text-green-400'
-                            : 'bg-white/5 border-white/10 hover:bg-white/10 text-foreground'}
-                    `}
-                >
-                    {copied ? (
-                        <>
-                            <Check className="w-4 h-4" /> Copiado!
-                        </>
-                    ) : (
-                        <>
-                            <Copy className="w-4 h-4" /> Copiar Plan
-                        </>
-                    )}
-                </motion.button>
+                <div className="flex items-center gap-2">
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleExport}
+                        disabled={isExporting}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm font-medium text-foreground disabled:opacity-50"
+                    >
+                        {isExporting ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                        Exportar PDF
+                    </motion.button>
+
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleCopy}
+                        className={`
+                            flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-sm font-medium
+                            ${copied
+                                ? 'bg-green-500/10 border-green-500/50 text-green-400'
+                                : 'bg-white/5 border-white/10 hover:bg-white/10 text-foreground'}
+                        `}
+                    >
+                        {copied ? (
+                            <>
+                                <Check className="w-4 h-4" /> Copiado!
+                            </>
+                        ) : (
+                            <>
+                                <Copy className="w-4 h-4" /> Copiar Plan
+                            </>
+                        )}
+                    </motion.button>
+                </div>
             </div>
 
-            <div className="p-6 sm:p-8 prose prose-invert max-w-none 
+            <div id="analysis-report" className="p-6 sm:p-8 prose prose-invert max-w-none 
                 prose-headings:text-primary prose-headings:font-bold prose-headings:tracking-tight
                 prose-p:text-foreground/90 prose-p:leading-relaxed
                 prose-strong:text-primary prose-strong:font-bold
