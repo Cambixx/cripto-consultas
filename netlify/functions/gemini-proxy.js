@@ -1,6 +1,7 @@
-const axios = require('axios');
+import { GoogleGenAI } from "@google/genai";
 
-exports.handler = async (event, context) => {
+export const handler = async (event, context) => {
+    // Solo permitir POST
     if (event.httpMethod !== "POST") {
         return { statusCode: 405, body: "Method Not Allowed" };
     }
@@ -10,48 +11,53 @@ exports.handler = async (event, context) => {
         const apiKey = process.env.GEMINI_API_KEY;
 
         if (!apiKey) {
-            return { statusCode: 500, body: JSON.stringify({ error: "No API Key" }) };
+            return {
+                statusCode: 500,
+                body: JSON.stringify({ error: "Gemini API Key missing on server" })
+            };
         }
 
-        // 1. Intento Principal: gemini-1.5-flash (v1beta) - El estándar actual
-        try {
-            console.log("Intento 1: gemini-1.5-flash (v1beta)");
-            const response = await axios.post(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-                { contents: [{ parts: [{ text: prompt }] }] },
-                { headers: { 'Content-Type': 'application/json' } }
-            );
-            return {
-                statusCode: 200,
-                body: JSON.stringify({ analysis: response.data.candidates[0].content.parts[0].text })
-            };
-        } catch (e) {
-            console.warn("Fallo intento 1:", e.response?.data?.error?.message || e.message);
+        const ai = new GoogleGenAI({ apiKey });
+
+        // Usamos el modelo exacto que indica la documentación (gemini-3-flash-preview)
+        // Y añadimos un fallback por si todavía no está disponible en tu región.
+        const models = ["gemini-3-flash-preview", "gemini-2.0-flash-exp", "gemini-1.5-flash"];
+        let lastError = null;
+
+        for (const modelName of models) {
+            try {
+                console.log(`Proxy (SDK GenAI): Intentando con ${modelName}...`);
+                const response = await ai.models.generateContent({
+                    model: modelName,
+                    contents: prompt
+                });
+
+                if (response && response.text) {
+                    console.log(`Proxy Success: ${modelName} respondió OK.`);
+                    return {
+                        statusCode: 200,
+                        headers: { "Content-Type": "application/json" },
+                        // response.text ya es el string directo en el nuevo SDK
+                        body: JSON.stringify({ analysis: response.text }),
+                    };
+                }
+            } catch (err) {
+                console.warn(`Error con ${modelName}:`, err.message);
+                lastError = err;
+                // Si la clave es inválida, paramos
+                if (err.message.includes("403") || err.message.includes("401")) break;
+            }
         }
 
-        // 2. Intento Secundario: gemini-pro (v1) - El clásico estable
-        try {
-            console.log("Intento 2: gemini-pro (v1)");
-            const response = await axios.post(
-                `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${apiKey}`,
-                { contents: [{ parts: [{ text: prompt }] }] },
-                { headers: { 'Content-Type': 'application/json' } }
-            );
-            return {
-                statusCode: 200,
-                body: JSON.stringify({ analysis: response.data.candidates[0].content.parts[0].text })
-            };
-        } catch (e) {
-            console.warn("Fallo intento 2:", e.response?.data?.error?.message || e.message);
-            throw e; // Si ambos fallan, lanzamos el error del segundo
-        }
+        throw lastError || new Error("Todos los modelos fallaron.");
 
     } catch (error) {
+        console.error("Proxy Error Final:", error);
         return {
             statusCode: 500,
             body: JSON.stringify({
-                error: error.response?.data?.error?.message || error.message,
-                details: "Ambos modelos (1.5-flash y gemini-pro) fallaron. Verifica tu API Key."
+                error: error.message,
+                details: "Asegúrate de que tu API Key tenga acceso a los modelos 'Preview' en Google AI Studio."
             }),
         };
     }
