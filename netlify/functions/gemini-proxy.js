@@ -1,49 +1,63 @@
-import { GoogleGenAI } from "@google/genai";
+const axios = require('axios');
 
-export const handler = async (event, context) => {
+exports.handler = async (event, context) => {
+    // Solo permitir POST
     if (event.httpMethod !== "POST") {
         return { statusCode: 405, body: "Method Not Allowed" };
     }
 
     try {
         const { prompt } = JSON.parse(event.body);
-        // El SDK busca automáticamente process.env.GEMINI_API_KEY si no se pasa en el constructor
         const apiKey = process.env.GEMINI_API_KEY;
 
         if (!apiKey) {
-            throw new Error("GEMINI_API_KEY no encontrada en el entorno del servidor.");
+            return {
+                statusCode: 500,
+                body: JSON.stringify({ error: "GEMINI_API_KEY no configurada en Netlify" })
+            };
         }
 
-        const ai = new GoogleGenAI({ apiKey });
+        // Lista de modelos según documentación 2026 (Febrero)
+        // Probamos gemini-3-flash primero por ser el más moderno
+        const attempts = [
+            { model: "gemini-3-flash", version: "v1beta" },
+            { model: "gemini-1.5-flash", version: "v1" }
+        ];
 
-        // Intentamos con la serie 3 que es la que marca la documentación actual
-        const models = ["gemini-3-flash", "gemini-3-flash-preview", "gemini-1.5-flash"];
         let lastError = null;
 
-        for (const modelName of models) {
+        for (const attempt of attempts) {
             try {
-                console.log(`Proxy (SDK v3): Intentando con ${modelName}...`);
-                const response = await ai.models.generateContent({
-                    model: modelName,
-                    contents: prompt
-                });
+                console.log(`Proxy (REST): Intentando ${attempt.model} via ${attempt.version}...`);
 
-                if (response && response.text) {
+                const response = await axios.post(
+                    `https://generativelanguage.googleapis.com/${attempt.version}/models/${attempt.model}:generateContent?key=${apiKey}`,
+                    {
+                        contents: [{ parts: [{ text: prompt }] }]
+                    },
+                    {
+                        headers: { 'Content-Type': 'application/json' }
+                    }
+                );
+
+                if (response.data && response.data.candidates && response.data.candidates[0].content.parts[0].text) {
                     return {
                         statusCode: 200,
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ analysis: response.text }),
+                        body: JSON.stringify({ analysis: response.data.candidates[0].content.parts[0].text }),
                     };
                 }
-            } catch (err) {
-                console.warn(`Fallo con ${modelName}:`, err.message);
-                lastError = err;
-                // Si es un error de credenciales, no seguimos intentando otros modelos
-                if (err.message.includes("403") || err.message.includes("401")) break;
+            } catch (error) {
+                const errorMsg = error.response?.data?.error?.message || error.message;
+                console.warn(`Fallo en proxy [${attempt.model}]:`, errorMsg);
+                lastError = new Error(errorMsg);
+
+                // Si es error de API Key (401/403), no seguimos rotando
+                if (error.response?.status === 401 || error.response?.status === 403) break;
             }
         }
 
-        throw lastError || new Error("No se pudo obtener respuesta de Gemini 3.");
+        throw lastError || new Error("No se pudo obtener respuesta de Gemini.");
 
     } catch (error) {
         console.error("Proxy Error Final:", error);
@@ -51,7 +65,7 @@ export const handler = async (event, context) => {
             statusCode: 500,
             body: JSON.stringify({
                 error: error.message,
-                details: "Asegúrate de que GEMINI_API_KEY esté correctamente configurada en Netlify."
+                details: "Error en la función serverless. Verifica la API KEY en el panel de Netlify."
             }),
         };
     }
