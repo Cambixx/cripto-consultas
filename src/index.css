@@ -6,27 +6,31 @@
 
 @layer base {
   :root {
-    --background: 230 40% 4%;
-    --foreground: 210 40% 98%;
-    --card: 230 40% 6%;
-    --card-foreground: 210 40% 98%;
-    --popover: 230 40% 4%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 199 89% 48%;
-    /* Neon Cyan */
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 199 89% 48%;
-    --accent-foreground: 210 40% 98%;
+    --background: 0 0% 0%;
+    /* #000000 */
+    --foreground: 0 0% 100%;
+    /* #FFFFFF */
+    --card: 0 0% 3%;
+    /* #080808 */
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 3%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 105 98% 50%;
+    /* #43f906 Neon Green */
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 105 98% 50%;
+    --accent-foreground: 0 0% 0%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 199 89% 48%;
-    --radius: 0.75rem;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 105 98% 50%;
+    --radius: 0px;
+    /* Brutalist: No rounded corners */
   }
 }
 
@@ -36,11 +40,9 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/30;
+    @apply bg-background text-foreground font-sans antialiased selection:bg-primary selection:text-black;
     font-family: 'Space Grotesk', sans-serif;
-    background-image:
-      radial-gradient(at 0% 0%, hsla(199, 89%, 48%, 0.05) 0, transparent 50%),
-      radial-gradient(at 100% 0%, hsla(270, 89%, 48%, 0.05) 0, transparent 50%);
+    /* Brutalist: No soft gradients, maybe grid lines later */
   }
 
   .font-mono {
@@ -48,10 +50,22 @@
   }
 }
 
+/* Brutalist "Glass" -> Raw Panel */
 .glass {
-  @apply bg-card/60 backdrop-blur-md border border-white/5;
+  @apply bg-card border border-white/20 hover:border-primary/50 transition-colors;
 }
 
+/* Brutalist Shadow -> Hard Shadow */
 .neo-shadow {
-  box-shadow: 0 0 20px -5px hsla(199, 89%, 48%, 0.2);
+  box-shadow: 4px 4px 0px 0px var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.brutal-border {
+  border: 1px solid white;
+}
+
+.brutal-btn {
+  @apply bg-primary text-black font-bold uppercase tracking-wider hover:bg-white hover:text-black transition-all active:translate-y-1;
+  box-shadow: 4px 4px 0px 0px white;
 }

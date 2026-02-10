@@ -174,7 +174,7 @@ const App = () => {
 
             <motion.div variants={itemVariants} className={`grid gap-6 ${isSplitView ? 'lg:grid-cols-2' : 'grid-cols-1'}`}>
               {/* Main Chart */}
-              <div className="glass rounded-2xl neo-shadow p-6 border border-white/5 order-1">
+              <div className="bg-black border-4 border-white neo-shadow p-6 order-1">
                 {selectedCrypto && candles.length > 0 ? (
                   <PriceChart
                     data={candles}
@@ -183,15 +183,15 @@ const App = () => {
                     indicators={indicators}
                   />
                 ) : (
-                  <div className="h-[400px] flex items-center justify-center text-muted-foreground border-dashed border-2 border-white/5 rounded-xl font-mono text-xs uppercase tracking-widest text-center px-8">
-                    {isMarketLoading ? 'Sincronizando flujos...' : 'Carga un activo principal'}
+                  <div className="h-[400px] flex items-center justify-center text-primary border-4 border-dashed border-primary/20 bg-black font-mono text-xs uppercase tracking-[0.3em] text-center px-8">
+                    {isMarketLoading ? '> ESTABLECIENDO CONEXIÓN...' : '> ESPERANDO ACTIVO PRINCIPAL'}
                   </div>
                 )}
               </div>
 
               {/* Comparison Chart */}
               {isSplitView && (
-                <div className="glass rounded-2xl neo-shadow p-6 border border-white/5 order-2">
+                <div className="bg-black border-4 border-white neo-shadow p-6 order-2">
                   {compareCrypto && compareCandles.length > 0 ? (
                     <PriceChart
                       data={compareCandles}
@@ -199,32 +199,30 @@ const App = () => {
                       timeframe={timeframe}
                     />
                   ) : (
-                    <div className="h-[400px] flex items-center justify-center text-muted-foreground border-dashed border-2 border-white/5 rounded-xl font-mono text-xs uppercase tracking-widest text-center px-8">
-                      {isCompareLoading ? 'Analizando liquidez...' : 'Carga un activo para comparar'}
+                    <div className="h-[400px] flex items-center justify-center text-primary border-4 border-dashed border-primary/20 bg-black font-mono text-xs uppercase tracking-[0.3em] text-center px-8">
+                      {isCompareLoading ? '> ESCANEANDO LIQUIDEZ...' : '> ESPERANDO ACTIVO SECUNDARIO'}
                     </div>
                   )}
                 </div>
               )}
             </motion.div>
 
-            <motion.div variants={itemVariants} className="glass p-6 sm:p-8 rounded-2xl space-y-8 neo-shadow border border-white/5">
+            <motion.div variants={itemVariants} className="bg-black p-6 sm:p-8 border-4 border-white space-y-8 neo-shadow">
               <StrategySelector selected={strategy} onSelect={setStrategy} />
 
               <motion.button
-                whileHover={{ scale: 1.01, boxShadow: "0 0 30px -10px hsla(199, 89%, 48%, 0.5)" }}
-                whileTap={{ scale: 0.99 }}
+                whileTap={{ scale: 0.98, x: 4, y: 4 }}
                 onClick={handleAnalysis}
                 disabled={!selectedCrypto || isAnalysisLoading}
-                className="w-full bg-gradient-to-r from-blue-600 via-primary to-blue-400 text-white font-bold py-5 rounded-2xl shadow-xl transition-all disabled:opacity-50 text-xl tracking-tight relative overflow-hidden group"
+                className="w-full bg-primary text-black font-black py-6 border-4 border-white neo-shadow transition-all disabled:opacity-50 text-2xl tracking-[0.1em] uppercase relative overflow-hidden group"
               >
-                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 slant" />
                 {isAnalysisLoading ? (
-                  <span className="flex items-center justify-center gap-3">
-                    <BrainCircuit className="w-7 h-7 animate-spin" />
-                    Sincronizando con el Oráculo Pro...
+                  <span className="flex items-center justify-center gap-4">
+                    <BrainCircuit className="w-8 h-8 animate-spin" />
+                    PROCESANDO DATOS...
                   </span>
                 ) : (
-                  'ANALIZAR MULTI-TEMPORALIDAD AHORA'
+                  'EJECUTAR ANÁLISIS DEL ORÁCULO'
                 )}
               </motion.button>
             </motion.div>

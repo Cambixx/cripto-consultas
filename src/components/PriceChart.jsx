@@ -33,15 +33,15 @@ const PriceChart = ({ data, symbol, timeframe, indicators: externalIndicators })
             width: chartContainerRef.current.clientWidth,
             height: 450,
             grid: {
-                vertLines: { color: 'rgba(40, 40, 40, 0.3)' },
-                horzLines: { color: 'rgba(40, 40, 40, 0.3)' },
+                vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
+                horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
             },
             timeScale: {
                 timeVisible: true,
-                borderColor: '#374151',
+                borderColor: '#ffffff10',
             },
             rightPriceScale: {
-                borderColor: '#374151',
+                borderColor: '#ffffff10',
             }
         });
 
@@ -54,11 +54,11 @@ const PriceChart = ({ data, symbol, timeframe, indicators: externalIndicators })
         else if (firstPrice >= 1 && firstPrice < 1000) { precision = 3; minMove = 0.001; }
 
         const candlestickSeries = chart.addSeries(CandlestickSeries, {
-            upColor: '#22c55e',
-            downColor: '#ef4444',
+            upColor: '#43f906',
+            downColor: '#ff3131',
             borderVisible: false,
-            wickUpColor: '#22c55e',
-            wickDownColor: '#ef4444',
+            wickUpColor: '#43f906',
+            wickDownColor: '#ff3131',
             priceFormat: { type: 'price', precision, minMove },
         });
 
@@ -211,10 +211,10 @@ const PriceChart = ({ data, symbol, timeframe, indicators: externalIndicators })
     const latestIndicators = allIndicators;
 
     return (
-        <div className="w-full space-y-4 relative">
+        <div className="w-full space-y-6 relative bg-black">
             {/* Overlay Indicators */}
             {latestIndicators && (
-                <div className="absolute top-16 right-4 z-10 flex flex-col items-end gap-2">
+                <div className="absolute top-20 right-4 z-10 flex flex-col items-end gap-3">
                     {/* Spot Score Badge */}
                     {latestIndicators.latest.spotScore && (
                         <SpotScoreBadge score={latestIndicators.latest.spotScore} />
@@ -224,24 +224,24 @@ const PriceChart = ({ data, symbol, timeframe, indicators: externalIndicators })
                         <StochRSIBadge value={latestIndicators.latest.stochRSI} />
                     )}
                     {latestIndicators.latest.isWhaleActivity && (
-                        <div className="px-3 py-1.5 rounded-lg border border-blue-400/20 bg-blue-400/10 text-blue-400 backdrop-blur-md flex items-center gap-2 neo-shadow animate-pulse">
+                        <div className="px-3 py-2 border-2 border-blue-500 bg-black text-blue-500 flex items-center gap-2 neo-shadow animate-pulse">
                             <Sparkles className="w-4 h-4" />
-                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest">Whale Activity</span>
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em]">WHALE_DETECTED</span>
                         </div>
                     )}
                 </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b-2 border-white/10 pb-4">
                 <div className="flex flex-col">
-                    <h3 className="font-bold text-xl tracking-tight text-foreground flex items-center gap-2">
-                        {symbol} <span className="text-muted-foreground font-light text-sm">/ USDT</span>
-                        <span className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] rounded-full font-mono uppercase">
+                    <h3 className="font-black text-3xl tracking-tighter text-white flex items-center gap-3 uppercase italic">
+                        {symbol} <span className="text-primary not-italic">/USDT</span>
+                        <span className="px-3 py-1 bg-primary text-black text-[10px] font-black uppercase tracking-widest">
                             {timeframe}
                         </span>
                     </h3>
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono mt-1">
-                        Spot Trading • Auto-refresh 30s • TV Engine v5
+                    <div className="text-[10px] text-primary uppercase tracking-[0.4em] font-bold mt-1">
+                        [ ENGINE_V5 // LIVE_DATA // SPOT_ONLY ]
                     </div>
                 </div>
 
@@ -253,19 +253,19 @@ const PriceChart = ({ data, symbol, timeframe, indicators: externalIndicators })
                         color="bg-emerald-500"
                     />
                     <IndicatorToggle
-                        label="EMA 50"
+                        label="EMA_50"
                         active={toggles.ema50}
                         onClick={() => toggleIndicator('ema50')}
                         color="bg-blue-500"
                     />
                     <IndicatorToggle
-                        label="EMA 200"
+                        label="EMA_200"
                         active={toggles.ema200}
                         onClick={() => toggleIndicator('ema200')}
                         color="bg-purple-500"
                     />
                     <IndicatorToggle
-                        label="Bands"
+                        label="BANDS"
                         active={toggles.bb}
                         onClick={() => toggleIndicator('bb')}
                         color="bg-yellow-500"
@@ -273,33 +273,33 @@ const PriceChart = ({ data, symbol, timeframe, indicators: externalIndicators })
                 </div>
             </div>
 
-            <div ref={chartContainerRef} className="w-full relative min-h-[450px] lg:min-h-[550px]" />
+            <div ref={chartContainerRef} className="w-full relative min-h-[450px] lg:min-h-[550px] border-2 border-white/5 bg-black/40" />
         </div>
     );
 };
 
 const SpotScoreBadge = ({ score }) => {
     const { score: val, signal } = score;
-    let bgClass, textClass;
-    if (val >= 7) { bgClass = 'bg-green-500/15 border-green-500/30'; textClass = 'text-green-400'; }
-    else if (val >= 5) { bgClass = 'bg-yellow-500/15 border-yellow-500/30'; textClass = 'text-yellow-400'; }
-    else { bgClass = 'bg-red-500/15 border-red-500/30'; textClass = 'text-red-400'; }
+    let colorClass;
+    if (val >= 7) { colorClass = 'border-green-500 text-green-500'; }
+    else if (val >= 5) { colorClass = 'border-yellow-500 text-yellow-500'; }
+    else { colorClass = 'border-red-500 text-red-500'; }
 
     const signalLabels = {
-        'COMPRA_FUERTE': '🟢 COMPRAR',
-        'COMPRA': '🟡 OPORTUNIDAD',
-        'ESPERAR': '🟠 ESPERAR',
-        'NO_COMPRAR': '🔴 NO COMPRAR',
+        'COMPRA_FUERTE': 'STRONG_BUY',
+        'COMPRA': 'OPPORTUNITY',
+        'ESPERAR': 'WAIT_ZONE',
+        'NO_COMPRAR': 'DANGER_ZONE',
     };
 
     return (
-        <div className={`px-3 py-1.5 rounded-lg border backdrop-blur-md flex items-center gap-2 neo-shadow ${bgClass}`}>
-            <Target className={`w-4 h-4 ${textClass}`} />
+        <div className={`px-4 py-2 border-2 bg-black flex items-center gap-3 neo-shadow ${colorClass}`}>
+            <Target className="w-5 h-5" />
             <div className="flex flex-col items-end">
-                <span className="text-[10px] font-mono uppercase tracking-tighter opacity-70">Spot Score</span>
-                <div className="flex items-center gap-1.5">
-                    <span className={`text-sm font-bold font-mono ${textClass}`}>{val}/10</span>
-                    <span className="text-[9px] font-mono">{signalLabels[signal] || signal}</span>
+                <span className="text-[9px] font-mono uppercase tracking-widest font-bold opacity-70">SPOT_SCORE</span>
+                <div className="flex items-center gap-2">
+                    <span className="text-lg font-black font-mono">{val}/10</span>
+                    <span className="text-[9px] font-mono font-bold bg-white/10 px-1">{signalLabels[signal] || signal}</span>
                 </div>
             </div>
         </div>
@@ -309,14 +309,14 @@ const SpotScoreBadge = ({ score }) => {
 const RSIBadge = ({ value }) => {
     const isOverbought = value >= 70;
     const isOversold = value <= 30;
-    const color = isOverbought ? 'text-red-400 bg-red-400/10 border-red-400/20'
-        : isOversold ? 'text-green-400 bg-green-400/10 border-green-400/20'
-            : 'text-primary bg-primary/10 border-primary/20';
+    const color = isOverbought ? 'text-red-500 border-red-500'
+        : isOversold ? 'text-green-500 border-green-500'
+            : 'text-primary border-primary';
 
     return (
-        <div className={`px-3 py-1.5 rounded-lg border backdrop-blur-md flex items-center gap-2 neo-shadow ${color}`}>
-            <span className="text-[10px] font-mono uppercase tracking-tighter opacity-70">RSI(14)</span>
-            <span className="text-sm font-bold font-mono">{value.toFixed(2)}</span>
+        <div className={`px-4 py-2 border-2 bg-black flex items-center gap-3 neo-shadow ${color}`}>
+            <span className="text-[9px] font-mono uppercase tracking-widest font-bold opacity-70">RSI_14</span>
+            <span className="text-lg font-black font-mono">{value.toFixed(2)}</span>
         </div>
     );
 };
@@ -325,14 +325,14 @@ const StochRSIBadge = ({ value }) => {
     const k = value.k || 0;
     const isOversold = k <= 20;
     const isOverbought = k >= 80;
-    const color = isOverbought ? 'text-red-400 bg-red-400/10 border-red-400/20'
-        : isOversold ? 'text-green-400 bg-green-400/10 border-green-400/20'
-            : 'text-primary bg-primary/10 border-primary/20';
+    const color = isOverbought ? 'text-red-500 border-red-500'
+        : isOversold ? 'text-green-500 border-green-500'
+            : 'text-primary border-primary';
 
     return (
-        <div className={`px-3 py-1.5 rounded-lg border backdrop-blur-md flex items-center gap-2 neo-shadow ${color}`}>
-            <span className="text-[10px] font-mono uppercase tracking-tighter opacity-70">StochRSI</span>
-            <span className="text-sm font-bold font-mono">{k.toFixed(1)}</span>
+        <div className={`px-4 py-2 border-2 bg-black flex items-center gap-3 neo-shadow ${color}`}>
+            <span className="text-[9px] font-mono uppercase tracking-widest font-bold opacity-70">STOCH_K</span>
+            <span className="text-lg font-black font-mono">{k.toFixed(1)}</span>
         </div>
     );
 };
@@ -341,18 +341,20 @@ const IndicatorToggle = ({ label, active, onClick, color }) => (
     <button
         onClick={onClick}
         className={`
-            px-3 py-1.5 rounded-lg text-xs font-mono transition-all border
+            px-4 py-2 text-[10px] font-black font-mono transition-all border-2 uppercase tracking-widest
             ${active
-                ? `${color}/20 text-foreground border-${color}/50 neo-shadow`
-                : 'bg-white/5 text-muted-foreground border-white/10 hover:bg-white/10'}
+                ? `bg-primary text-black border-white shadow-[2px_2px_0px_white]`
+                : 'bg-black text-white/50 border-white/10 hover:border-primary hover:text-white'}
         `}
     >
-        <span className="flex items-center gap-1.5">
-            <div className={`w-2 h-2 rounded-full ${active ? color : 'bg-muted-foreground/30'}`} />
+        <span className="flex items-center gap-2">
+            <div className={`w-2 h-2 ${active ? 'bg-black' : color}`} />
             {label}
         </span>
     </button>
 );
 
 export default PriceChart;
+
+
 

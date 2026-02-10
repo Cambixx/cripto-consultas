@@ -88,68 +88,66 @@ const AnalysisResult = ({ analysis, isLoading, error }) => {
         <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-5xl mx-auto glass rounded-2xl neo-shadow overflow-hidden border border-white/10"
+            className="w-full max-w-5xl mx-auto bg-black border-4 border-white neo-shadow overflow-hidden"
         >
-            <div className="bg-primary/5 p-4 sm:p-6 border-b border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                        <Bot className="w-6 h-6 text-primary" />
+            <div className="bg-primary p-4 sm:p-6 border-b-4 border-white flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-4">
+                    <div className="p-2 bg-black border-2 border-white">
+                        <Bot className="w-8 h-8 text-primary" />
                     </div>
                     <div>
-                        <h2 className="font-bold text-xl tracking-tight">Plan de Trading IA</h2>
-                        <p className="text-xs text-muted-foreground font-mono">Generado por Gemini Pro • MTF Analysis Engine</p>
+                        <h2 className="font-black text-2xl tracking-tighter text-black uppercase italic">INFORME DE INTELIGENCIA</h2>
+                        <p className="text-[10px] text-black/70 font-mono font-bold">GEMINI 3 PRO • ANALYSIS CORE v3.1</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                     <motion.button
-                        whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={handleExport}
                         disabled={isExporting}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm font-medium text-foreground disabled:opacity-50"
+                        className="flex items-center gap-2 px-5 py-2.5 bg-black text-white border-2 border-white hover:bg-white hover:text-black transition-all text-sm font-black uppercase tracking-widest"
                     >
                         {isExporting ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                        Exportar PDF
+                        EXPORT.PDF
                     </motion.button>
 
                     <motion.button
-                        whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={handleCopy}
                         className={`
-                            flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-sm font-medium
+                            flex items-center gap-2 px-5 py-2.5 border-2 transition-all text-sm font-black uppercase tracking-widest
                             ${copied
-                                ? 'bg-green-500/10 border-green-500/50 text-green-400'
-                                : 'bg-white/5 border-white/10 hover:bg-white/10 text-foreground'}
+                                ? 'bg-white text-black border-white'
+                                : 'bg-black text-white border-white hover:bg-white hover:text-black'}
                         `}
                     >
                         {copied ? (
                             <>
-                                <Check className="w-4 h-4" /> Copiado!
+                                <Check className="w-4 h-4" /> COPIADO
                             </>
                         ) : (
                             <>
-                                <Copy className="w-4 h-4" /> Copiar Plan
+                                <Copy className="w-4 h-4" /> CLONAR.TXT
                             </>
                         )}
                     </motion.button>
                 </div>
             </div>
 
-            <div id="analysis-report" className="p-6 sm:p-8 prose prose-invert max-w-none 
-                prose-headings:text-primary prose-headings:font-bold prose-headings:tracking-tight
-                prose-p:text-foreground/90 prose-p:leading-relaxed
-                prose-strong:text-primary prose-strong:font-bold
-                prose-code:text-primary prose-code:bg-primary/5 prose-code:px-1 prose-code:rounded
-                prose-ul:list-disc prose-li:text-foreground/80
+            <div id="analysis-report" className="p-8 sm:p-12 prose prose-invert max-w-none font-mono
+                prose-headings:text-primary prose-headings:font-black prose-headings:tracking-tighter prose-headings:uppercase
+                prose-p:text-white prose-p:leading-relaxed prose-p:text-sm
+                prose-strong:text-primary prose-strong:font-black
+                prose-code:text-primary prose-code:bg-white/10 prose-code:px-2 prose-code:py-0.5
+                prose-ul:list-square prose-li:text-white/90
             ">
                 <ReactMarkdown>{analysis}</ReactMarkdown>
             </div>
 
-            <div className="bg-black/20 p-4 border-t border-white/5 text-center px-6">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-medium leading-relaxed">
-                    Disclaimer: El trading de criptomonedas conlleva un alto riesgo. Este análisis es experimental y no constituye asesoría financiera. Opera bajo tu propio riesgo.
+            <div className="bg-black p-4 border-t-2 border-white/10 text-center px-6">
+                <p className="text-[10px] text-white/40 uppercase tracking-[0.4em] font-bold leading-relaxed">
+                    [ ADVERTENCIA: OPERACIONES DE ALTO RIESGO. ESTE ANALISIS ES UNICA Y EXCLUSIVAMENTE EXPERIMENTAL ]
                 </p>
             </div>
         </motion.div>
