@@ -19,39 +19,55 @@ exports.handler = async (event, context) => {
 
         const genAI = new GoogleGenerativeAI(apiKey);
 
-        // Lista de modelos a intentar en orden de preferencia
-        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
+        // Lista de modelos a intentar. gemini-1.5-flash-latest es el más estable para la v1beta/v1
+        const modelsToTry = [
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-latest",
+            "gemini-1.5-pro",
+            "gemini-1.0-pro",
+            "gemini-2.0-flash-exp"
+        ];
         let lastError = null;
 
         for (const modelName of modelsToTry) {
             try {
                 console.log(`Proxy: Intentando con modelo ${modelName}...`);
+                // Algunos modelos en v1beta requieren models/ prefix si el SDK no lo pone, 
+                // pero @google/generative-ai lo suele manejar.
                 const model = genAI.getGenerativeModel({ model: modelName });
+
                 const result = await model.generateContent(prompt);
                 const response = await result.response;
                 const text = response.text();
 
-                // Si llegamos aquí, tuvimos éxito
-                return {
-                    statusCode: 200,
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ analysis: text }),
-                };
+                if (text) {
+                    return {
+                        statusCode: 200,
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ analysis: text }),
+                    };
+                }
             } catch (error) {
-                console.warn(`Proxy: Falló modelo ${modelName}:`, error.message);
+                console.warn(`Proxy fail [${modelName}]:`, error.message);
                 lastError = error;
-                // Continuar al siguiente modelo
+                // Si es un error de API Key (403/401), no hace falta seguir rotando modelos
+                if (error.message.includes("403") || error.message.includes("401")) {
+                    break;
+                }
             }
         }
 
         // Si todos fallan
-        throw lastError || new Error("Todos los modelos fallaron");
+        throw lastError || new Error("Todos los modelos fallaron o la API Key no tiene permisos.");
 
     } catch (error) {
         console.error("Proxy Error Final:", error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: error.message }),
+            body: JSON.stringify({
+                error: error.message,
+                details: "Asegúrate de que GEMINI_API_KEY en Netlify es válida y tiene habilitado el modelo gemini-1.5-flash."
+            }),
         };
     }
 };
