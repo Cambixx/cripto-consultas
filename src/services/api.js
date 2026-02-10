@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+
 
 const BINANCE_API_URL = 'https://api.binance.com/api/v3';
 
