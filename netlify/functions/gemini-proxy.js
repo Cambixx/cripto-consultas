@@ -19,27 +19,36 @@ exports.handler = async (event, context) => {
 
         const genAI = new GoogleGenerativeAI(apiKey);
 
-        // Intentar con el modelo más robusto primero
-        let model;
-        try {
-            model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        } catch (e) {
-            model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        // Lista de modelos a intentar en orden de preferencia
+        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
+        let lastError = null;
+
+        for (const modelName of modelsToTry) {
+            try {
+                console.log(`Proxy: Intentando con modelo ${modelName}...`);
+                const model = genAI.getGenerativeModel({ model: modelName });
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                const text = response.text();
+
+                // Si llegamos aquí, tuvimos éxito
+                return {
+                    statusCode: 200,
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ analysis: text }),
+                };
+            } catch (error) {
+                console.warn(`Proxy: Falló modelo ${modelName}:`, error.message);
+                lastError = error;
+                // Continuar al siguiente modelo
+            }
         }
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
+        // Si todos fallan
+        throw lastError || new Error("Todos los modelos fallaron");
 
-        return {
-            statusCode: 200,
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ analysis: text }),
-        };
     } catch (error) {
-        console.error("Proxy Error:", error);
+        console.error("Proxy Error Final:", error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: error.message }),
