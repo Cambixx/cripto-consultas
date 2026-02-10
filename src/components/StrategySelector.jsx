@@ -4,26 +4,26 @@ import { Crosshair, TrendingUp, Activity } from 'lucide-react';
 
 const strategies = [
     {
-        id: 'trend_follower',
-        name: 'Seguidor de Tendencia',
+        id: 'swing_spot',
+        name: 'Swing Spot',
         icon: TrendingUp,
-        description: 'Opera a favor de la tendencia mayor. Ideal para movimientos grandes.',
+        description: 'Compra en soporte, vende en resistencia. Operaciones de días a semanas.',
         color: 'text-blue-400',
         border: 'border-blue-400/50'
     },
     {
-        id: 'scalper',
-        name: 'Scalper / Day Trader',
+        id: 'dca_accumulation',
+        name: 'Acumulación DCA',
         icon: Activity,
-        description: 'Movimientos rápidos intradía. Busca volatilidad a corto plazo.',
+        description: 'Compra escalonada en caídas. Promedia precio de entrada a la baja.',
         color: 'text-purple-400',
         border: 'border-purple-400/50'
     },
     {
-        id: 'mean_reversion',
-        name: 'Reversión a la Media',
+        id: 'breakout_buyer',
+        name: 'Compra en Breakout',
         icon: Crosshair,
-        description: 'Contra-tendencia. Busca precios extremos (sobrecompra/sobreventa).',
+        description: 'Compra al romper resistencias clave con volumen. Busca continuaciones.',
         color: 'text-green-400',
         border: 'border-green-400/50'
     }

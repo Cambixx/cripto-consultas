@@ -3,18 +3,46 @@ import axios from 'axios';
 import { Gauge } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+const CACHE_KEY = 'fng_cache';
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
 const FearAndGreed = ({ onValueChange }) => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchFNG = async () => {
+            // Check cache
+            try {
+                const cached = localStorage.getItem(CACHE_KEY);
+                if (cached) {
+                    const { value, timestamp } = JSON.parse(cached);
+                    if (Date.now() - timestamp < CACHE_DURATION) {
+                        setData(value);
+                        if (onValueChange) onValueChange(value);
+                        setLoading(false);
+                        return;
+                    }
+                }
+            } catch (e) {
+                // ignore cache errors
+            }
+
             try {
                 const response = await axios.get('https://api.alternative.me/fng/');
                 const result = response.data.data[0];
                 setData(result);
                 if (onValueChange) {
                     onValueChange(result);
+                }
+                // Save to cache
+                try {
+                    localStorage.setItem(CACHE_KEY, JSON.stringify({
+                        value: result,
+                        timestamp: Date.now()
+                    }));
+                } catch (e) {
+                    // ignore storage errors
                 }
             } catch (error) {
                 console.error("Error fetching Fear & Greed Index:", error);
@@ -57,3 +85,4 @@ const FearAndGreed = ({ onValueChange }) => {
 };
 
 export default FearAndGreed;
+

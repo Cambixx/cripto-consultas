@@ -21,7 +21,7 @@ export const getTopCryptos = async () => {
     }
 };
 
-export const getCandleData = async (symbol, interval, limit = 100) => {
+export const getCandleData = async (symbol, interval, limit = 300) => {
     try {
         const response = await axios.get(`${BINANCE_API_URL}/klines`, {
             params: {
@@ -46,63 +46,22 @@ export const getCandleData = async (symbol, interval, limit = 100) => {
     }
 };
 
-// Helper to check available models
-const validateGeminiAccess = async (apiKey) => {
-    try {
-        const response = await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-        return response.data.models?.map(m => m.name.replace('models/', '')) || [];
-    } catch (error) {
-        console.warn("Could not validate models via API, seeing what happens:", error);
-        return [];
-    }
-};
-
 export const getGeminiAnalysis = async (apiKey, prompt) => {
-    const genAI = new GoogleGenerativeAI(apiKey);
-
-    let attempts = [
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-pro",
-        "gemini-pro",
-        "gemini-1.0-pro",
-        "gemini-2.0-flash-exp"
-    ];
-
-    // Try to dynamically fetch available models to prioritize them
     try {
-        const available = await validateGeminiAccess(apiKey);
-        if (available.length > 0) {
-            console.log("Found available models:", available);
-            // innovative sort: prioritize flash/pro models that are in our known list or look valid
-            const validAvailable = available.filter(m =>
-                m.includes('gemini') && (m.includes('flash') || m.includes('pro'))
-            );
+        // En producción y desarrollo con Netlify CLI, las funciones están en /.netlify/functions/
+        const response = await axios.post('/.netlify/functions/gemini-proxy', {
+            prompt: prompt
+        });
 
-            // Put available models first, but keep our fallbacks just in case
-            attempts = [...new Set([...validAvailable, ...attempts])];
+        if (response.data && response.data.analysis) {
+            return response.data.analysis;
+        } else {
+            throw new Error("Respuesta de IA vacía o inválida");
         }
-    } catch (e) {
-        console.warn("Model validation check skipped", e);
-    }
-
-    console.log("Will attempt models in this order:", attempts);
-
-    for (const modelName of attempts) {
-        try {
-            console.log(`Attempting Gemini model: ${modelName}`);
-            const model = genAI.getGenerativeModel({ model: modelName });
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            return response.text();
-        } catch (error) {
-            console.warn(`Model ${modelName} failed:`, error.message);
-            // Continue to next model
-            if (modelName === attempts[attempts.length - 1]) {
-                console.error("All model attempts failed.");
-                throw new Error(`Failed to generate content. All attempts failed. Models tried: ${attempts.join(', ')}. Last error: ${error.message}`);
-            }
-        }
+    } catch (error) {
+        console.error("Error calling Gemini Proxy:", error);
+        const errorMsg = error.response?.data?.error || error.message;
+        throw new Error(`Error en el análisis: ${errorMsg}`);
     }
 };
 // Helper to determine timeframes

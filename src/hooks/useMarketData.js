@@ -1,5 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { getTopCryptos, getCandleData, getMultiTimeframeData } from '../services/api';
+import { calculateIndicators } from '../utils/indicators';
+
+const REFRESH_INTERVAL = 30_000; // 30 seconds
 
 export const useMarketData = (selectedCrypto, timeframe) => {
     const [cryptos, setCryptos] = useState([]);
@@ -8,6 +11,7 @@ export const useMarketData = (selectedCrypto, timeframe) => {
     const [marketSentiment, setMarketSentiment] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const refreshTimerRef = useRef(null);
 
     // Fetch initial crypto list
     useEffect(() => {
@@ -23,22 +27,50 @@ export const useMarketData = (selectedCrypto, timeframe) => {
     }, []);
 
     // Fetch candles when selectedCrypto or timeframe changes
+    const fetchCandles = useCallback(async (showLoading = true) => {
+        if (!selectedCrypto) return;
+        if (showLoading) setIsLoading(true);
+        try {
+            const data = await getCandleData(selectedCrypto.symbol, timeframe);
+            setCandles(data);
+            setError('');
+        } catch (e) {
+            console.error("Failed to fetch candles", e);
+            if (showLoading) setError("Error al obtener datos del gráfico.");
+        } finally {
+            if (showLoading) setIsLoading(false);
+        }
+    }, [selectedCrypto, timeframe]);
+
     useEffect(() => {
-        const fetchData = async () => {
-            if (!selectedCrypto) return;
-            setIsLoading(true);
-            try {
-                const data = await getCandleData(selectedCrypto.symbol, timeframe);
-                setCandles(data);
-            } catch (e) {
-                console.error("Failed to fetch candles", e);
-                setError("Error al obtener datos del gráfico.");
-            } finally {
-                setIsLoading(false);
+        fetchCandles(true);
+    }, [fetchCandles]);
+
+    // Auto-refresh every 30s
+    useEffect(() => {
+        if (!selectedCrypto) return;
+
+        refreshTimerRef.current = setInterval(() => {
+            fetchCandles(false); // silent refresh
+        }, REFRESH_INTERVAL);
+
+        return () => {
+            if (refreshTimerRef.current) {
+                clearInterval(refreshTimerRef.current);
             }
         };
-        fetchData();
-    }, [selectedCrypto, timeframe]);
+    }, [selectedCrypto, timeframe, fetchCandles]);
+
+    // Calculate indicators from candle data
+    const indicators = useMemo(() => {
+        if (!candles || candles.length < 50) return null;
+        try {
+            return calculateIndicators(candles);
+        } catch (e) {
+            console.error("Indicator calculation error:", e);
+            return null;
+        }
+    }, [candles]);
 
     const fetchMTFData = useCallback(async () => {
         if (!selectedCrypto) return null;
@@ -55,6 +87,7 @@ export const useMarketData = (selectedCrypto, timeframe) => {
     return {
         cryptos,
         candles,
+        indicators,
         mtfData,
         marketSentiment,
         setMarketSentiment,
@@ -64,3 +97,4 @@ export const useMarketData = (selectedCrypto, timeframe) => {
         fetchMTFData
     };
 };
+

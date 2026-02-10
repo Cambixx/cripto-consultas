@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createChart, ColorType, CandlestickSeries, LineSeries } from 'lightweight-charts';
 import { calculateIndicators } from '../utils/indicators';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Target, TrendingUp } from 'lucide-react';
 
-const PriceChart = ({ data, symbol, timeframe }) => {
+const PriceChart = ({ data, symbol, timeframe, indicators: externalIndicators }) => {
     const chartContainerRef = useRef();
     const chartRef = useRef();
     const seriesRef = useRef({});
@@ -12,7 +12,8 @@ const PriceChart = ({ data, symbol, timeframe }) => {
     const [toggles, setToggles] = useState({
         ema50: false,
         ema200: false,
-        bb: false
+        bb: false,
+        sr: true, // S/R on by default
     });
 
     useEffect(() => {
@@ -84,15 +85,17 @@ const PriceChart = ({ data, symbol, timeframe }) => {
         };
     }, [data]);
 
-    // Memoized indicator calculations
+    // Use external indicators if available, otherwise calculate
     const allIndicators = React.useMemo(() => {
+        if (externalIndicators) return externalIndicators;
         if (!data.length) return null;
         return calculateIndicators(data);
-    }, [data]);
+    }, [data, externalIndicators]);
 
     useEffect(() => {
         if (!chartRef.current || !allIndicators || !seriesRef.current.candles) return;
         const chart = chartRef.current;
+        const candleSeries = seriesRef.current.candles;
 
         // EMA 50
         if (toggles.ema50) {
@@ -144,6 +147,43 @@ const PriceChart = ({ data, symbol, timeframe }) => {
             seriesRef.current.bbLower = null;
             seriesRef.current.bbMiddle = null;
         }
+
+        // Support/Resistance price lines
+        // Clean up old S/R lines
+        if (seriesRef.current.srLines) {
+            seriesRef.current.srLines.forEach(line => {
+                try { candleSeries.removePriceLine(line); } catch (e) { /* ignore */ }
+            });
+        }
+        seriesRef.current.srLines = [];
+
+        if (toggles.sr && allIndicators.latest.supportResistance) {
+            const { supports, resistances } = allIndicators.latest.supportResistance;
+
+            supports.forEach((s) => {
+                const line = candleSeries.createPriceLine({
+                    price: s.price,
+                    color: 'rgba(34, 197, 94, 0.6)',
+                    lineWidth: 1,
+                    lineStyle: 2,
+                    axisLabelVisible: true,
+                    title: `S (${s.count})`,
+                });
+                seriesRef.current.srLines.push(line);
+            });
+
+            resistances.forEach((r) => {
+                const line = candleSeries.createPriceLine({
+                    price: r.price,
+                    color: 'rgba(239, 68, 68, 0.6)',
+                    lineWidth: 1,
+                    lineStyle: 2,
+                    axisLabelVisible: true,
+                    title: `R (${r.count})`,
+                });
+                seriesRef.current.srLines.push(line);
+            });
+        }
     }, [toggles, allIndicators]);
 
     useEffect(() => {
@@ -175,11 +215,18 @@ const PriceChart = ({ data, symbol, timeframe }) => {
             {/* Overlay Indicators */}
             {latestIndicators && (
                 <div className="absolute top-16 right-4 z-10 flex flex-col items-end gap-2">
+                    {/* Spot Score Badge */}
+                    {latestIndicators.latest.spotScore && (
+                        <SpotScoreBadge score={latestIndicators.latest.spotScore} />
+                    )}
                     <RSIBadge value={latestIndicators.latest.rsi} />
+                    {latestIndicators.latest.stochRSI && (
+                        <StochRSIBadge value={latestIndicators.latest.stochRSI} />
+                    )}
                     {latestIndicators.latest.isWhaleActivity && (
                         <div className="px-3 py-1.5 rounded-lg border border-blue-400/20 bg-blue-400/10 text-blue-400 backdrop-blur-md flex items-center gap-2 neo-shadow animate-pulse">
                             <Sparkles className="w-4 h-4" />
-                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest">Whale Activity Detected</span>
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest">Whale Activity</span>
                         </div>
                     )}
                 </div>
@@ -194,11 +241,17 @@ const PriceChart = ({ data, symbol, timeframe }) => {
                         </span>
                     </h3>
                     <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono mt-1">
-                        Live Market Execution • TV Engine v5
+                        Spot Trading • Auto-refresh 30s • TV Engine v5
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <IndicatorToggle
+                        label="S/R"
+                        active={toggles.sr}
+                        onClick={() => toggleIndicator('sr')}
+                        color="bg-emerald-500"
+                    />
                     <IndicatorToggle
                         label="EMA 50"
                         active={toggles.ema50}
@@ -225,6 +278,34 @@ const PriceChart = ({ data, symbol, timeframe }) => {
     );
 };
 
+const SpotScoreBadge = ({ score }) => {
+    const { score: val, signal } = score;
+    let bgClass, textClass;
+    if (val >= 7) { bgClass = 'bg-green-500/15 border-green-500/30'; textClass = 'text-green-400'; }
+    else if (val >= 5) { bgClass = 'bg-yellow-500/15 border-yellow-500/30'; textClass = 'text-yellow-400'; }
+    else { bgClass = 'bg-red-500/15 border-red-500/30'; textClass = 'text-red-400'; }
+
+    const signalLabels = {
+        'COMPRA_FUERTE': '🟢 COMPRAR',
+        'COMPRA': '🟡 OPORTUNIDAD',
+        'ESPERAR': '🟠 ESPERAR',
+        'NO_COMPRAR': '🔴 NO COMPRAR',
+    };
+
+    return (
+        <div className={`px-3 py-1.5 rounded-lg border backdrop-blur-md flex items-center gap-2 neo-shadow ${bgClass}`}>
+            <Target className={`w-4 h-4 ${textClass}`} />
+            <div className="flex flex-col items-end">
+                <span className="text-[10px] font-mono uppercase tracking-tighter opacity-70">Spot Score</span>
+                <div className="flex items-center gap-1.5">
+                    <span className={`text-sm font-bold font-mono ${textClass}`}>{val}/10</span>
+                    <span className="text-[9px] font-mono">{signalLabels[signal] || signal}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const RSIBadge = ({ value }) => {
     const isOverbought = value >= 70;
     const isOversold = value <= 30;
@@ -236,6 +317,22 @@ const RSIBadge = ({ value }) => {
         <div className={`px-3 py-1.5 rounded-lg border backdrop-blur-md flex items-center gap-2 neo-shadow ${color}`}>
             <span className="text-[10px] font-mono uppercase tracking-tighter opacity-70">RSI(14)</span>
             <span className="text-sm font-bold font-mono">{value.toFixed(2)}</span>
+        </div>
+    );
+};
+
+const StochRSIBadge = ({ value }) => {
+    const k = value.k || 0;
+    const isOversold = k <= 20;
+    const isOverbought = k >= 80;
+    const color = isOverbought ? 'text-red-400 bg-red-400/10 border-red-400/20'
+        : isOversold ? 'text-green-400 bg-green-400/10 border-green-400/20'
+            : 'text-primary bg-primary/10 border-primary/20';
+
+    return (
+        <div className={`px-3 py-1.5 rounded-lg border backdrop-blur-md flex items-center gap-2 neo-shadow ${color}`}>
+            <span className="text-[10px] font-mono uppercase tracking-tighter opacity-70">StochRSI</span>
+            <span className="text-sm font-bold font-mono">{k.toFixed(1)}</span>
         </div>
     );
 };
@@ -258,3 +355,4 @@ const IndicatorToggle = ({ label, active, onClick, color }) => (
 );
 
 export default PriceChart;
+

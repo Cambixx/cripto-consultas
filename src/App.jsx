@@ -29,7 +29,7 @@ const App = () => {
   const [selectedCrypto, setSelectedCrypto] = useState(null);
   const [compareCrypto, setCompareCrypto] = useState(null);
   const [timeframe, setTimeframe] = useState('4h');
-  const [strategy, setStrategy] = useState('trend_follower');
+  const [strategy, setStrategy] = useState('swing_spot');
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSplitView, setIsSplitView] = useState(false);
@@ -38,6 +38,7 @@ const App = () => {
   const {
     cryptos,
     candles,
+    indicators,
     marketSentiment,
     setMarketSentiment,
     isLoading: isMarketLoading,
@@ -179,6 +180,7 @@ const App = () => {
                     data={candles}
                     symbol={selectedCrypto.symbol}
                     timeframe={timeframe}
+                    indicators={indicators}
                   />
                 ) : (
                   <div className="h-[400px] flex items-center justify-center text-muted-foreground border-dashed border-2 border-white/5 rounded-xl font-mono text-xs uppercase tracking-widest text-center px-8">
